@@ -15,6 +15,7 @@ export class ChunkBuilder {
     this.colliders = []; // THREE.Box3
     this.floorRects = []; // {x0,z0,x1,z1}
     this.hidingSpots = [];
+    this.searchables = [];
     this.items = [];
     this.doors = [];
     this.lights = [];
@@ -111,6 +112,13 @@ export class ChunkBuilder {
     this.hidingSpots.push({ position: position.clone(), kind, radius, occupied: false });
   }
 
+  // A searchable container (e.g. a drawer/dresser) - not a hiding spot, but
+  // something the player can press E on once to roll for loot (coins or a
+  // random item).
+  addSearchable(position, kind, radius = 1.1) {
+    this.searchables.push({ position: position.clone(), kind, radius, searched: false });
+  }
+
   addItem(position, type, extra = {}) {
     this.items.push({ position: position.clone(), type, ...extra, collected: false, id: `${type}_${this.items.length}_${Math.floor(this.rng.next() * 100000)}` });
   }
@@ -186,6 +194,7 @@ export class ChunkBuilder {
       grid: this.grid,
       gridOrigin: this.gridOrigin,
       hidingSpots: this.hidingSpots,
+      searchables: this.searchables,
       items: this.items,
       doors: this.doors,
       lights: this.lights,

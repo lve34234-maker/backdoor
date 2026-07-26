@@ -1,4 +1,4 @@
-const MAX_SLOTS = 6;
+const MAX_SLOTS = 12;
 
 export class Inventory {
   constructor() {

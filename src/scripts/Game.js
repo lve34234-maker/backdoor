@@ -29,6 +29,25 @@ const HIDE_SPOT_MESSAGES = {
   vent: '환풍구 안에 몸을 숨겼다...'
 };
 
+// Every item type the player can find, either on the floor or by
+// searching a drawer. "key" is the only one placed deliberately (tied to
+// locked doors); everything else can turn up as random drawer loot.
+const ITEM_DEFS = {
+  battery: { label: '배터리', icon: '🔋' },
+  health: { label: '구급 키트', icon: '✚' },
+  bandage: { label: '붕대', icon: '🩹' },
+  snack: { label: '에너지바', icon: '🍫' },
+  water: { label: '생수', icon: '💧' },
+  energy_drink: { label: '에너지 드링크', icon: '🥤' },
+  lighter: { label: '라이터', icon: '🔥' },
+  key: { label: '열쇠', icon: '🔑' },
+  photo: { label: '오래된 사진', icon: '📷', flavor: '누군가의 웃는 얼굴... 여기와는 어울리지 않는다.' },
+  cassette: { label: '카세트 테이프', icon: '📼', flavor: '잡음 속에서 희미한 목소리가 들리는 것 같다.' },
+  map_fragment: { label: '지도 조각', icon: '🗺️', flavor: '출구로 가는 단서일지도 모른다.' },
+  compass: { label: '나침반', icon: '🧭', flavor: '바늘이 미세하게 떨리며 계속 돈다.' }
+};
+const DRAWER_LOOT_ITEMS = ['battery', 'health', 'bandage', 'snack', 'water', 'energy_drink', 'lighter', 'photo', 'cassette', 'map_fragment', 'compass'];
+
 export class Game {
   constructor(canvas) {
     this.canvas = canvas;
@@ -67,6 +86,7 @@ export class Game {
     this.doorsSinceHit = 0;
     this.runStartTime = 0;
     this.deathCause = '';
+    this.coins = 0;
     this.interactTarget = null;
     this._chunkAmbientAudio = [];
 
@@ -227,6 +247,7 @@ export class Game {
     this.doorsSinceHit = 0;
     this.runTimeSec = 0;
     this.runStartTime = 0;
+    this.coins = 0;
     this._enterChunk(1);
     this._startPlaying();
   }
@@ -243,6 +264,7 @@ export class Game {
     this.entitiesSeen = save.entitiesSeen || {};
     this.doorsSinceHit = save.doorsSinceHit || 0;
     this.runTimeSec = save.runTimeSec || 0;
+    this.coins = save.coins || 0;
     this._enterChunk(this.doorIndex);
     this._startPlaying();
   }
@@ -443,6 +465,8 @@ export class Game {
       }
     } else if (this.interactTarget?.type === 'hideSpot') {
       this._enterHiding(this.interactTarget.ref);
+    } else if (this.interactTarget?.type === 'searchable') {
+      this._searchDrawer(this.interactTarget.ref);
     } else if (this.interactTarget?.type === 'item') {
       this._collectItem(this.interactTarget.ref);
     }
@@ -468,19 +492,81 @@ export class Game {
     if (item.collected) return;
     item.collected = true;
     if (item.mesh) item.mesh.visible = false;
+    this._applyItemEffect(item.type, item.id);
+  }
+
+  // Shared by floor pickups and drawer loot: applies whatever the item type
+  // does (heal, refill stamina, add battery, or just go into the inventory
+  // as a key/collectible) and shows the matching notification.
+  _applyItemEffect(type, id) {
+    const def = ITEM_DEFS[type] || { label: type, icon: '?' };
     this.stats.recordItemCollected();
     this.audio.pickupChime();
 
-    if (item.type === 'battery') {
-      this.flashlight.addBattery(35);
-      this.ui.hud.notify('배터리를 획득했다.');
-    } else if (item.type === 'health') {
-      this.player.heal(30);
-      this.ui.hud.notify('구급 키트를 사용했다.');
-    } else if (item.type === 'key') {
-      this.inventory.add({ type: 'key', label: '열쇠', id: item.id });
-      this.ui.hud.notify('열쇠를 획득했다.');
+    switch (type) {
+      case 'battery':
+        this.flashlight.addBattery(35);
+        this.ui.hud.notify('배터리를 획득했다.');
+        break;
+      case 'health':
+        this.player.heal(30);
+        this.ui.hud.notify('구급 키트를 사용했다.');
+        break;
+      case 'bandage':
+        this.player.heal(15);
+        this.ui.hud.notify('붕대로 상처를 감쌌다.');
+        break;
+      case 'snack':
+        this.player.stamina = 100;
+        this.ui.hud.notify('에너지바를 먹었다. 기운이 난다.');
+        break;
+      case 'water':
+        this.player.stamina = Math.min(100, this.player.stamina + 40);
+        this.ui.hud.notify('생수를 마셨다.');
+        break;
+      case 'energy_drink':
+        this.player.stamina = 100;
+        this.ui.hud.notify('에너지 드링크를 마셨다! 스태미나가 가득 찼다.');
+        break;
+      case 'lighter':
+        this.flashlight.addBattery(20);
+        this.ui.hud.notify('라이터를 발견했다.');
+        break;
+      case 'key':
+        this.inventory.add({ type: 'key', label: '열쇠', id: id || `key_${Date.now()}` });
+        this.ui.hud.notify('열쇠를 획득했다.');
+        break;
+      default:
+        this.inventory.add({ type, label: def.label, id: id || `${type}_${Date.now()}` });
+        this.ui.hud.notify(`${def.label}을(를) 발견했다.${def.flavor ? ` ${def.flavor}` : ''}`);
+        break;
     }
+  }
+
+  _searchDrawer(spot) {
+    if (spot.searched) {
+      this.ui.hud.notify('이미 뒤진 서랍이다.');
+      return;
+    }
+    spot.searched = true;
+    this.audio.uiClick();
+
+    const roll = Math.random();
+    if (roll < 0.12) {
+      this.ui.hud.notify('서랍이 비어 있었다...');
+      return;
+    }
+    if (roll < 0.6) {
+      const amount = Math.floor(Math.random() * 100) + 1;
+      this.coins += amount;
+      this.stats.recordCoins(amount);
+      this.audio.pickupChime();
+      this.ui.hud.notify(`동전 ${amount}개를 발견했다!`);
+      if (this.stats.data.totalCoins >= 100) this.achievements.unlock('coin_collector');
+      return;
+    }
+    const type = DRAWER_LOOT_ITEMS[Math.floor(Math.random() * DRAWER_LOOT_ITEMS.length)];
+    this._applyItemEffect(type);
   }
 
   // ---------------- damage / entities ----------------
@@ -588,6 +674,18 @@ export class Game {
     }
 
     if (!this.interactTarget) {
+      for (const spot of this.currentChunk.searchables || []) {
+        if (spot.searched) continue;
+        const d = p.distanceTo(spot.position);
+        if (d < spot.radius) {
+          this.interactTarget = { type: 'searchable', ref: spot };
+          prompt = 'E - 서랍 뒤지기';
+          break;
+        }
+      }
+    }
+
+    if (!this.interactTarget) {
       for (const item of this.currentChunk.items) {
         if (item.collected) continue;
         const d = p.distanceTo(item.position);
@@ -672,7 +770,8 @@ export class Game {
       battery: this.flashlight.battery,
       isHidden: this.player.isHidden,
       interactPrompt: this._interactPrompt,
-      inventory: this.inventory.items
+      inventory: this.inventory.items,
+      coins: this.coins
     });
   }
 
@@ -685,7 +784,8 @@ export class Game {
       inventory: this.inventory.serialize(),
       entitiesSeen: this.entitiesSeen,
       doorsSinceHit: this.doorsSinceHit,
-      runTimeSec: this.runTimeSec
+      runTimeSec: this.runTimeSec,
+      coins: this.coins
     };
   }
 }

@@ -142,6 +142,7 @@ export function statsHTML(stats, achievements) {
         <div class="bd-row"><span>발견한 페이크 문</span><span>${stats.fakeDoorsFound}</span></div>
         <div class="bd-row"><span>수집한 아이템</span><span>${stats.itemsCollected}</span></div>
         <div class="bd-row"><span>은신 횟수</span><span>${stats.timesHidden}</span></div>
+        <div class="bd-row"><span>누적 획득 코인</span><span>${stats.totalCoins || 0}</span></div>
         <h2 style="margin-top:1.5rem">Achievements (${achievements.filter((a) => a.unlocked).length}/${achievements.length})</h2>
         <div class="codex-grid">
           ${achievements.map((a) => `

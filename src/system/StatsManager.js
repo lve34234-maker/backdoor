@@ -8,7 +8,8 @@ const DEFAULTS = () => ({
   entitiesEncountered: {},
   fakeDoorsFound: 0,
   itemsCollected: 0,
-  timesHidden: 0
+  timesHidden: 0,
+  totalCoins: 0
 });
 
 export class StatsManager {
@@ -53,6 +54,7 @@ export class StatsManager {
   recordFakeDoor() { this.data.fakeDoorsFound += 1; this.save(); }
   recordItemCollected() { this.data.itemsCollected += 1; this.save(); }
   recordHidden() { this.data.timesHidden += 1; this.save(); }
+  recordCoins(amount) { this.data.totalCoins += amount; this.save(); }
 
   reset() {
     this.data = DEFAULTS();

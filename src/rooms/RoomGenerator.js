@@ -4,6 +4,7 @@ import { carveCorridor, carveRoomRect, carveMaze, emitWallsFromGrid, cellCenterW
 import { Grid } from '../system/Pathfinding.js';
 import { createDoor, createFakeDoorPair } from './DoorSystem.js';
 import { scatterHidingSpots, createWardrobe, createBoxStack } from './HidingSpots.js';
+import { createDrawer } from './SearchableFurniture.js';
 import { pickHazard } from './Traps.js';
 
 // Doors 1 and 2 are always entity-free so a new player can learn the
@@ -172,6 +173,14 @@ function buildCorridorChunk(rng, doorIndex) {
     createWardrobe(builder, c.x, c.z, side === 1 ? -Math.PI / 2 : Math.PI / 2);
   }
 
+  // Occasional searchable drawer along the corridor, on its own wall spot
+  if (rng.bool(0.35)) {
+    const spotZ = rng.range(4, Math.max(5, length1 - 3));
+    const side = rng.bool(0.5) ? -1 : 1;
+    const c = cellCenterWorld(marginX + side * (CORRIDOR_WIDTH / 2 - 0.4), spotZ, originX, originZ, 1);
+    createDrawer(builder, c.x, c.z, side === 1 ? -Math.PI / 2 : Math.PI / 2);
+  }
+
   builder.playerSpawn = { x: 0, y: 0, z: 0.6, yaw: 0 };
   const { lockedExit } = placeItemsAndEntity(builder, grid, originX, originZ, rng, doorIndex, { allowLock: true });
   createDoor(builder, exitWorld.x, exitWorld.z, exitYaw, { doorNumber: doorIndex, locked: lockedExit });
@@ -234,6 +243,14 @@ function buildRoomChunk(rng, doorIndex, { hiding = false } = {}) {
     const { rx, rz } = pickSpacedPoint(rng, roomX0, roomZ0, roomW, roomH, 1.2, furnitureMinDist, placedFurniture);
     const c = cellCenterWorld(rx, rz, originX, originZ, 1);
     createBoxStack(builder, c.x, c.z);
+  }
+
+  // Searchable drawers - one or two per room, loot for coins/items
+  const drawerCount = hiding ? rng.int(1, 2) : rng.bool(0.6) ? 1 : 0;
+  for (let i = 0; i < drawerCount; i++) {
+    const { rx, rz } = pickSpacedPoint(rng, roomX0, roomZ0, roomW, roomH, 1.2, furnitureMinDist, placedFurniture);
+    const c = cellCenterWorld(rx, rz, originX, originZ, 1);
+    createDrawer(builder, c.x, c.z, rng.range(0, Math.PI * 2));
   }
 
   builder.playerSpawn = { x: 0, y: 0, z: 0.6, yaw: 0 };

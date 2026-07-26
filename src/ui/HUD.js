@@ -28,6 +28,7 @@ export class HUD {
         </div>
         <div class="hud-bottom-right">
           <div class="hud-hide-status" id="hud-hide-status" style="display:none">숨는 중...</div>
+          <div class="hud-coins">💰 <span id="hud-coins-count">0</span></div>
           <div class="hud-inventory" id="hud-inventory"></div>
         </div>
         <div class="hud-interact-prompt" id="hud-interact"></div>
@@ -56,6 +57,7 @@ export class HUD {
     this.staminaBar = document.getElementById('bar-stamina');
     this.batteryBar = document.getElementById('bar-battery');
     this.hideStatusEl = document.getElementById('hud-hide-status');
+    this.coinsEl = document.getElementById('hud-coins-count');
     this.inventoryEl = document.getElementById('hud-inventory');
     this.interactEl = document.getElementById('hud-interact');
     this.damageFlashEl = document.getElementById('damage-flash');
@@ -125,6 +127,8 @@ export class HUD {
     if (state.inventory) {
       this.inventoryEl.innerHTML = state.inventory.map((item) => `<div class="inv-slot" title="${item.label}">${iconFor(item.type)}</div>`).join('');
     }
+
+    if (state.coins != null) this.coinsEl.textContent = state.coins;
   }
 
   flashDamage() {
@@ -155,8 +159,14 @@ export class HUD {
   }
 }
 
+const ICONS = {
+  key: '🔑', battery: '🔋', health: '✚', bandage: '🩹', snack: '🍫',
+  water: '💧', energy_drink: '🥤', lighter: '🔥',
+  photo: '📷', cassette: '📼', map_fragment: '🗺️', compass: '🧭'
+};
+
 function iconFor(type) {
-  return { key: '🔑', battery: '🔋', health: '✚' }[type] || '?';
+  return ICONS[type] || '?';
 }
 
 function jumpscareSVG() {

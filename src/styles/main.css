@@ -289,6 +289,14 @@ html, body {
   text-shadow: 0 0 6px #000;
 }
 
+.hud-coins {
+  color: var(--bd-yellow);
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 6px #000;
+  font-variant-numeric: tabular-nums;
+}
+
 .hud-inventory {
   display: flex;
   gap: 0.4rem;

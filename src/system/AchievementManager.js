@@ -14,7 +14,8 @@ export const ACHIEVEMENT_DEFS = [
   { id: 'survivor_5', name: '생존 본능', desc: '5번 사망 후에도 포기하지 않았다.' },
   { id: 'codex_complete', name: '개체 도감 완성', desc: '모든 엔티티 종류를 목격했다.' },
   { id: 'no_hit_25', name: '완벽한 잠입', desc: '피해 없이 25개의 문을 통과했다.' },
-  { id: 'speedrunner', name: '스피드러너', desc: '10분 이내에 30개의 문을 통과했다.' }
+  { id: 'speedrunner', name: '스피드러너', desc: '10분 이내에 30개의 문을 통과했다.' },
+  { id: 'coin_collector', name: '동전 수집가', desc: '서랍에서 누적 100코인을 모았다.' }
 ];
 
 export class AchievementManager {
