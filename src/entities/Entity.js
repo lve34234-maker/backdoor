@@ -32,9 +32,17 @@ function lineOfSightClear(grid, origin, cellSize, fromPos, toPos) {
 }
 
 export class Entity {
-  constructor(type, position) {
+  constructor(type, position, difficulty = {}) {
+    const { speedMult = 1, damageMult = 1 } = difficulty;
     this.type = type;
-    this.def = ENTITY_DEFS[type];
+    this.def = { ...ENTITY_DEFS[type] };
+    if (speedMult !== 1) {
+      this.def.speedPatrol *= speedMult;
+      this.def.speedChase *= speedMult;
+    }
+    if (damageMult !== 1 && !this.def.instaKill) {
+      this.def.damage = Math.min(100, Math.round(this.def.damage * damageMult));
+    }
     this.mesh = buildEntityMesh(this.def);
     this.mesh.position.copy(position);
     this.dead = false;

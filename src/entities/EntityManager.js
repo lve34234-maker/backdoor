@@ -6,17 +6,17 @@ export class EntityManager {
     this.active = [];
   }
 
-  spawnForChunk(chunk) {
+  spawnForChunk(chunk, difficulty = {}) {
     this.clear();
     if (!chunk.entitySpawn) return;
     const { type, position } = chunk.entitySpawn;
-    const entity = new Entity(type, position);
+    const entity = new Entity(type, position, difficulty);
     this.scene.add(entity.mesh);
     this.active.push(entity);
   }
 
-  spawnAt(type, position) {
-    const entity = new Entity(type, position);
+  spawnAt(type, position, difficulty = {}) {
+    const entity = new Entity(type, position, difficulty);
     this.scene.add(entity.mesh);
     this.active.push(entity);
     return entity;

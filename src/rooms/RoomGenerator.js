@@ -6,6 +6,7 @@ import { createDoor, createFakeDoorPair } from './DoorSystem.js';
 import { scatterHidingSpots, createWardrobe, createBoxStack } from './HidingSpots.js';
 import { createDrawer } from './SearchableFurniture.js';
 import { pickHazard } from './Traps.js';
+import { TOTAL_DOORS, FINAL_DOOR_INDEX, dangerFactor, doorDisplayNumber } from './Difficulty.js';
 
 // Doors 1 and 2 are always entity-free so a new player can learn the
 // controls (movement, doors, hiding) before anything starts hunting them.
@@ -23,8 +24,8 @@ const ENTITY_WEIGHTS_BY_DANGER = (danger) => [
 ];
 
 function chooseChunkType(rng, doorIndex) {
-  const danger = Math.min(1, doorIndex / 70);
-  if (doorIndex === 99) return 'finale';
+  const danger = dangerFactor(doorIndex, 70);
+  if (doorIndex === TOTAL_DOORS || doorIndex === FINAL_DOOR_INDEX) return 'finale';
   return rng.weightedPick([
     { value: 'corridor', weight: 4 },
     { value: 'room', weight: 2.6 },
@@ -49,7 +50,7 @@ function randomWalkableFarCell(grid, avoidX, avoidZ, minDist = 6, rng) {
 }
 
 function placeItemsAndEntity(builder, grid, originX, originZ, rng, doorIndex, opts = {}) {
-  const danger = Math.min(1, doorIndex / 70);
+  const danger = dangerFactor(doorIndex, 70);
   const entryCell = { x: Math.floor((0 - originX) / grid.cellSize), z: Math.floor((0.5 - originZ) / grid.cellSize) };
 
   // Items: battery / health pack / key, chance scales mildly with danger.
@@ -183,7 +184,7 @@ function buildCorridorChunk(rng, doorIndex) {
 
   builder.playerSpawn = { x: 0, y: 0, z: 0.6, yaw: 0 };
   const { lockedExit } = placeItemsAndEntity(builder, grid, originX, originZ, rng, doorIndex, { allowLock: true });
-  createDoor(builder, exitWorld.x, exitWorld.z, exitYaw, { doorNumber: doorIndex, locked: lockedExit });
+  createDoor(builder, exitWorld.x, exitWorld.z, exitYaw, { doorNumber: doorDisplayNumber(doorIndex), locked: lockedExit });
 
   builder.hazard = pickHazard(rng, doorIndex);
   return builder.build();
@@ -255,7 +256,7 @@ function buildRoomChunk(rng, doorIndex, { hiding = false } = {}) {
 
   builder.playerSpawn = { x: 0, y: 0, z: 0.6, yaw: 0 };
   const { lockedExit } = placeItemsAndEntity(builder, grid, originX, originZ, rng, doorIndex, { allowLock: true, forceEntity: hiding ? rng.pick(['watcher', 'crawler', 'shadow']) : undefined });
-  createDoor(builder, exitWorld.x, exitWorld.z, 0, { doorNumber: doorIndex, locked: lockedExit });
+  createDoor(builder, exitWorld.x, exitWorld.z, 0, { doorNumber: doorDisplayNumber(doorIndex), locked: lockedExit });
 
   builder.hazard = pickHazard(rng, doorIndex);
   return builder.build();
@@ -317,7 +318,7 @@ function buildMazeChunk(rng, doorIndex) {
 
   builder.playerSpawn = { x: 0, y: 0, z: 0.6, yaw: 0 };
   const { lockedExit } = placeItemsAndEntity(builder, grid, originX, originZ, rng, doorIndex, { allowLock: true, forceEntity: rng.bool(0.7) ? undefined : rng.pick(['crawler', 'watcher', 'monster']) });
-  createDoor(builder, exitWorld.x, exitWorld.z, 0, { doorNumber: doorIndex, locked: lockedExit });
+  createDoor(builder, exitWorld.x, exitWorld.z, 0, { doorNumber: doorDisplayNumber(doorIndex), locked: lockedExit });
 
   builder.hazard = pickHazard(rng, doorIndex);
   return builder.build();
@@ -356,7 +357,7 @@ function buildFakeDoorChunk(rng, doorIndex) {
 
   const doorCenterWorld = cellCenterWorld(centerX, exitZ, originXFinal, originZFinal, 1);
   builder.playerSpawn = { x: 0, y: 0, z: 0.6, yaw: 0 };
-  createFakeDoorPair(builder, doorCenterWorld.x, doorCenterWorld.z, 0, rng, doorIndex);
+  createFakeDoorPair(builder, doorCenterWorld.x, doorCenterWorld.z, 0, rng, doorDisplayNumber(doorIndex));
 
   placeItemsAndEntity(builder, grid, originXFinal, originZFinal, rng, doorIndex, { allowLock: false });
   builder.hazard = pickHazard(rng, doorIndex);
@@ -364,7 +365,7 @@ function buildFakeDoorChunk(rng, doorIndex) {
   return builder.build();
 }
 
-function buildFinaleChunk(rng) {
+function buildFinaleChunk(rng, doorIndex) {
   const builder = new ChunkBuilder(rng);
   const width = 30, height = 34;
   const grid = new Grid(width, height, 1);
@@ -384,11 +385,14 @@ function buildFinaleChunk(rng) {
   }
 
   builder.playerSpawn = { x: 0, y: 0, z: 0.6, yaw: 0 };
-  const finalDoor = createDoor(builder, exitWorld.x, exitWorld.z, 0, { doorNumber: 99, color: '#d6c34b' });
+  const finalDoor = createDoor(builder, exitWorld.x, exitWorld.z, 0, { doorNumber: doorDisplayNumber(doorIndex), color: '#d6c34b' });
   finalDoor.isFinal = true;
 
-  builder.entitySpawn = rng.bool(0.5) ? { type: 'rush', position: new THREE.Vector3(0, 0, length * 0.4) } : null;
-  builder.hazard = 'flicker';
+  // The basement's final floor is far more dangerous than the surface finale.
+  const danger = dangerFactor(doorIndex, 70);
+  const rushChance = Math.min(0.9, 0.5 + danger * 0.15);
+  builder.entitySpawn = rng.bool(rushChance) ? { type: 'rush', position: new THREE.Vector3(0, 0, length * 0.4) } : null;
+  builder.hazard = doorIndex > TOTAL_DOORS ? 'blackout' : 'flicker';
   return builder.build();
 }
 
@@ -401,7 +405,7 @@ export function generateChunk(doorIndex, rng) {
   else if (type === 'maze') chunk = buildMazeChunk(chunkRng, doorIndex);
   else if (type === 'deadend_fake') chunk = buildFakeDoorChunk(chunkRng, doorIndex);
   else if (type === 'hiding_room') chunk = buildRoomChunk(chunkRng, doorIndex, { hiding: true });
-  else chunk = buildFinaleChunk(chunkRng);
+  else chunk = buildFinaleChunk(chunkRng, doorIndex);
   chunk.type = type;
   chunk.doorIndex = doorIndex;
   return chunk;

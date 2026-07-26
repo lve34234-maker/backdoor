@@ -1,6 +1,15 @@
 // Pure HTML template builders for each full-screen UI panel. UIManager
 // injects these into #ui-root and wires up event listeners afterwards.
 
+const SURFACE_DOORS = 99;
+
+// Formats a raw internal door index (1-199) the way the player sees it:
+// "Door 42" on the surface, "지하 -3층" once past door 99 in the basement.
+function formatDoorNumber(n) {
+  if (n <= SURFACE_DOORS) return `Door ${n}`;
+  return `지하 -${n - SURFACE_DOORS}층`;
+}
+
 export function mainMenuHTML(hasSave) {
   return `
     <div class="bd-menu" id="screen-main">
@@ -53,12 +62,12 @@ export function settingsHTML(values) {
   `;
 }
 
-export function pauseMenuHTML(doorIndex) {
+export function pauseMenuHTML(doorLabel) {
   return `
     <div class="bd-menu" id="screen-pause">
       <div class="bd-panel" style="text-align:center">
         <h2 style="text-align:left">PAUSED</h2>
-        <p style="margin-bottom:1.5rem;color:#aaa;font-size:0.8rem">현재 문: Door ${String(doorIndex).padStart(2, '0')} / 99</p>
+        <p style="margin-bottom:1.5rem;color:#aaa;font-size:0.8rem">현재 위치: ${doorLabel}</p>
         <div class="bd-btn-list">
           <button class="bd-btn" id="btn-resume">Resume</button>
           <button class="bd-btn" id="btn-pause-settings">Settings</button>
@@ -77,10 +86,10 @@ export function gameOverHTML(stats) {
       <div class="bd-title">GAME OVER</div>
       <div class="bd-subtitle">${stats.cause || '알 수 없는 존재에게 붙잡혔다...'}</div>
       <div class="end-stats">
-        <span class="label">도달한 문</span><span>${stats.doorIndex} / 99</span>
+        <span class="label">도달한 곳</span><span>${formatDoorNumber(stats.doorIndex)}</span>
         <span class="label">생존 시간</span><span>${formatTime(stats.timeSec)}</span>
         <span class="label">총 사망 횟수</span><span>${stats.totalDeaths}</span>
-        <span class="label">최고 기록</span><span>Door ${stats.bestDoor}</span>
+        <span class="label">최고 기록</span><span>${formatDoorNumber(stats.bestDoor)}</span>
       </div>
       <div class="bd-btn-list" style="margin-top:1rem">
         <button class="bd-btn" id="btn-gameover-retry">Retry</button>
@@ -94,9 +103,10 @@ export function winHTML(stats) {
   return `
     <div class="end-screen win" id="screen-win">
       <div class="bd-title">YOU ESCAPED</div>
-      <div class="bd-subtitle">99개의 문을 모두 통과했다.</div>
+      <div class="bd-subtitle">99개의 문과 지하 -100층까지, 모두 통과했다.</div>
       <div class="end-stats">
         <span class="label">클리어 시간</span><span>${formatTime(stats.timeSec)}</span>
+        <span class="label">보유 코인</span><span>${stats.coins ?? 0}</span>
         <span class="label">총 완주 횟수</span><span>${stats.runsCompleted}</span>
         <span class="label">총 사망 횟수</span><span>${stats.totalDeaths}</span>
       </div>
@@ -137,7 +147,7 @@ export function statsHTML(stats, achievements) {
         <h2>Statistics</h2>
         <div class="bd-row"><span>총 플레이 시간</span><span>${formatTime(stats.totalPlayTimeSec)}</span></div>
         <div class="bd-row"><span>사망 횟수</span><span>${stats.deaths}</span></div>
-        <div class="bd-row"><span>최고 기록 (문)</span><span>Door ${stats.bestDoor}</span></div>
+        <div class="bd-row"><span>최고 기록</span><span>${formatDoorNumber(stats.bestDoor)}</span></div>
         <div class="bd-row"><span>탈출 성공 횟수</span><span>${stats.runsCompleted}</span></div>
         <div class="bd-row"><span>발견한 페이크 문</span><span>${stats.fakeDoorsFound}</span></div>
         <div class="bd-row"><span>수집한 아이템</span><span>${stats.itemsCollected}</span></div>

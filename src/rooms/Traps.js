@@ -1,11 +1,12 @@
 import * as THREE from 'three';
+import { dangerFactor } from './Difficulty.js';
 
 // Ambient hazards / random events that can occur once a chunk is entered.
 // These are atmospheric (lights, fog, sound, jump-scare flashes) rather
 // than the entity AI itself, which lives in src/entities.
 
 export function pickHazard(rng, doorIndex) {
-  const danger = Math.min(1, doorIndex / 60);
+  const danger = dangerFactor(doorIndex, 60);
   const entries = [
     { value: null, weight: Math.max(1, 6 - danger * 3) },
     { value: 'flicker', weight: 3 },

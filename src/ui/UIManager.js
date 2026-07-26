@@ -65,13 +65,13 @@ export class UIManager {
     document.getElementById('s-graphics').addEventListener('change', (e) => this.callbacks.onSettingsChanged?.('graphics', e.target.value));
     document.getElementById('s-lang').addEventListener('change', (e) => this.callbacks.onSettingsChanged?.('language', e.target.value));
     document.getElementById('btn-settings-back').onclick = () => {
-      if (returnTo === 'pause') this.showPause(this.callbacks.getDoorIndex?.() || 1);
+      if (returnTo === 'pause') this.showPause(this.callbacks.getDoorLabel?.() || 'Door 01 / 99');
       else this.showMainMenu(this.callbacks.hasSave?.());
     };
   }
 
-  showPause(doorIndex) {
-    this._show(pauseMenuHTML(doorIndex));
+  showPause(doorLabel) {
+    this._show(pauseMenuHTML(doorLabel));
     document.getElementById('btn-resume').onclick = () => this.callbacks.onResume?.();
     document.getElementById('btn-pause-settings').onclick = () => this.showSettings('pause');
     document.getElementById('btn-pause-codex').onclick = () => this.showCodex('pause');
@@ -102,7 +102,7 @@ export class UIManager {
     }));
     this._show(codexHTML(entries, returnTo === 'pause' ? 'Back to Pause' : 'Back'));
     document.getElementById('btn-codex-back').onclick = () => {
-      if (returnTo === 'pause') this.showPause(this.callbacks.getDoorIndex?.() || 1);
+      if (returnTo === 'pause') this.showPause(this.callbacks.getDoorLabel?.() || 'Door 01 / 99');
       else this.showMainMenu(this.callbacks.hasSave?.());
     };
   }

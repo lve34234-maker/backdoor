@@ -108,7 +108,7 @@ export class HUD {
       this._fpsFrames = 0;
     }
 
-    this.doorEl.textContent = `Door ${String(state.doorIndex).padStart(2, '0')} / 99`;
+    this.doorEl.textContent = state.doorLabel || `Door ${String(state.doorIndex).padStart(2, '0')} / 99`;
     this.objectiveEl.textContent = state.objective || '다음 문을 찾아 이동하세요.';
     this.healthBar.style.width = `${Math.max(0, state.health)}%`;
     this.staminaBar.style.width = `${Math.max(0, state.stamina)}%`;

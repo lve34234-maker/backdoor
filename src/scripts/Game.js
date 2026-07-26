@@ -16,8 +16,8 @@ import { HazardRunner } from '../rooms/Traps.js';
 import { EntityManager } from '../entities/EntityManager.js';
 import { UIManager } from '../ui/UIManager.js';
 import { BuildSystem } from './BuildSystem.js';
+import { TOTAL_DOORS, FINAL_DOOR_INDEX, dangerFactor, basementFloor } from '../rooms/Difficulty.js';
 
-const TOTAL_DOORS = 99;
 const INTERACT_RANGE = 1.6;
 const HIDE_SPOT_MESSAGES = {
   wardrobe: '옷장 안에 몸을 숨겼다...',
@@ -219,7 +219,7 @@ export class Game {
       getSettings: () => this.settings.values,
       onSettingsChanged: (key, value) => this.settings.set(key, value),
       hasSave: () => this.saveManager.hasSave(),
-      getDoorIndex: () => this.doorIndex,
+      getDoorLabel: () => this._doorLabel(),
       onResume: () => this._resume(),
       onSaveGame: () => { this._persist(); this.ui.hud.notify('저장되었다.'); },
       onQuitToMenu: () => this._quitToMenu(true),
@@ -294,7 +294,7 @@ export class Game {
       this.state = 'paused';
       this.input.setEnabled(false);
       this.input.exitPointerLock();
-      this.ui.showPause(this.doorIndex);
+      this.ui.showPause(this._doorLabel());
     } else if (this.state === 'paused') {
       this._resume();
     }
@@ -340,7 +340,14 @@ export class Game {
     this.player.teleport(chunk.playerSpawn.x, chunk.playerSpawn.y, chunk.playerSpawn.z, chunk.playerSpawn.yaw);
     this.player.setColliders(chunk.colliders);
     this.player.isHidden = false;
-    this.entityManager.spawnForChunk(chunk);
+
+    // Basement floors push entities further past the surface's max danger:
+    // faster and harder-hitting the deeper you go.
+    const dangerExtra = Math.max(0, dangerFactor(doorIndex, 70) - 1);
+    this.entityManager.spawnForChunk(chunk, {
+      speedMult: 1 + dangerExtra * 0.2,
+      damageMult: 1 + dangerExtra * 0.15
+    });
 
     this.audio.ambientHum(chunk.group);
     if (chunk.lights[0]) this.audio.fluorescentBuzz(chunk.lights[0].fixture || chunk.group);
@@ -363,11 +370,18 @@ export class Game {
     if (chunk.isFakeDoorRoom) objective = '두 개의 문 중 하나는 함정이다. 신중하게 선택하라.';
     else if (chunk.type === 'maze') objective = '미로를 빠져나가 출구 문을 찾으세요.';
     else if (chunk.type === 'hiding_room') objective = '위험하다... 숨을 곳을 확인하세요.';
+    if (doorIndex > TOTAL_DOORS) objective += ' (지하로 갈수록 더 위험해진다.)';
     this.objective = objective;
   }
 
   _doShadowFlash() {
     this.ui.hud.showJumpscare(140);
+  }
+
+  _doorLabel() {
+    if (this.doorIndex <= TOTAL_DOORS) return `Door ${String(this.doorIndex).padStart(2, '0')} / ${TOTAL_DOORS}`;
+    const floor = basementFloor(this.doorIndex);
+    return `지하 -${floor} / -100`;
   }
 
   _startDoorTransition(doorDef) {
@@ -380,17 +394,23 @@ export class Game {
     setTimeout(() => {
       this.ui.hud.fadeOut();
       setTimeout(() => {
-        if (doorDef.isFinal || this.doorIndex >= TOTAL_DOORS) {
+        if (doorDef.isFinal && this.doorIndex >= FINAL_DOOR_INDEX) {
           this._triggerWin();
         } else {
           this._advanceDoor();
         }
         this.ui.hud.fadeIn();
-        setTimeout(() => {
-          this.state = 'playing';
-          this.input.setEnabled(true);
-          this.input.requestPointerLock();
-        }, 250);
+        // Only re-enable play if we're still mid-transition - a terminal
+        // outcome (win/game over) may have changed state above, and this
+        // must not stomp back over it and silently resume simulation
+        // behind the end screen.
+        if (this.state === 'transition') {
+          setTimeout(() => {
+            this.state = 'playing';
+            this.input.setEnabled(true);
+            this.input.requestPointerLock();
+          }, 250);
+        }
       }, 550);
     }, 350);
   }
@@ -399,6 +419,10 @@ export class Game {
     const next = this.doorIndex + 1;
     this.doorsSinceHit += 1;
     this._checkDoorAchievements(next);
+    if (next === TOTAL_DOORS + 1) {
+      this.ui.hud.notify('탈출한 줄 알았지만... 발밑이 무너지며 더 깊은 곳으로 떨어졌다.');
+      this.achievements.unlock('basement_reached');
+    }
     this._enterChunk(next);
     this._persist();
   }
@@ -612,6 +636,7 @@ export class Game {
     this.state = 'gameover';
     this.input.setEnabled(false);
     this.input.exitPointerLock();
+    this.entityManager.clear();
     this.stats.recordDeath(this.doorIndex);
     this.achievements.unlock('first_death');
     if (this.stats.data.deaths >= 5) this.achievements.unlock('survivor_5');
@@ -627,17 +652,21 @@ export class Game {
   }
 
   _triggerWin() {
+    if (this.state === 'win') return;
     this.state = 'win';
     this.input.setEnabled(false);
     this.input.exitPointerLock();
-    this.stats.recordEscape(TOTAL_DOORS);
+    this.entityManager.clear();
+    this.hazardRunner = null;
+    this.stats.recordEscape(this.doorIndex);
     this.achievements.unlock('escaped');
     this.saveManager.clear();
     this.ui.hud.setVisible(false);
     this.ui.showWin({
       timeSec: this.runTimeSec,
       runsCompleted: this.stats.data.runsCompleted,
-      totalDeaths: this.stats.data.deaths
+      totalDeaths: this.stats.data.deaths,
+      coins: this.coins
     });
   }
 
@@ -764,6 +793,7 @@ export class Game {
 
     this.ui.hud.update(dt, {
       doorIndex: this.doorIndex,
+      doorLabel: this._doorLabel(),
       objective: this.objective,
       health: this.player.health,
       stamina: this.player.stamina,
