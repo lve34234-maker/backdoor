@@ -37,7 +37,7 @@ export class HUD {
           <div class="build-row"><span>가로 (W)</span><input type="number" id="build-w" min="0.2" max="4" step="0.1" value="1"></div>
           <div class="build-row"><span>높이 (H)</span><input type="number" id="build-h" min="0.2" max="4" step="0.1" value="1"></div>
           <div class="build-row"><span>깊이 (D)</span><input type="number" id="build-d" min="0.2" max="4" step="0.1" value="1"></div>
-          <div class="build-hint">G 설치 · H 제거 · B 종료</div>
+          <div class="build-hint">G 설치 · H 제거 · V 종료</div>
         </div>
       </div>
       <div id="vignette" style="display:none"></div>

@@ -20,7 +20,11 @@ export function createDoor(builder, x, z, rotY, opts = {}) {
 
   const group = new THREE.Group();
   group.position.set(x, 0, z);
-  group.rotation.y = rotY;
+  // +PI: rotY encodes the direction of travel through this door (the
+  // corridor/room forward axis), but the door's visible face (handle,
+  // number plate) needs to look back toward the side the player actually
+  // approaches from, not away down the direction of travel.
+  group.rotation.y = rotY + Math.PI;
 
   // Frame
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a3220, roughness: 0.9 });
@@ -62,14 +66,24 @@ export function createDoor(builder, x, z, rotY, opts = {}) {
   builder.group.add(group);
 
   // Static closed-door collider (removed once the transition begins).
+  // Rotation-aware: doors that face along the X axis (corridor bends) need
+  // their footprint swapped, or the collider ends up far too thin on the
+  // axis the door actually spans.
+  const facingX = Math.abs(Math.cos(rotY)) < 0.1;
+  const colliderSize = facingX
+    ? new THREE.Vector3(0.3, DOOR_HEIGHT, DOOR_WIDTH + 0.2)
+    : new THREE.Vector3(DOOR_WIDTH + 0.2, DOOR_HEIGHT, 0.3);
   const colliderBox = new THREE.Box3().setFromCenterAndSize(
     new THREE.Vector3(x, DOOR_HEIGHT / 2, z),
-    new THREE.Vector3(DOOR_WIDTH + 0.2, DOOR_HEIGHT, 0.3)
+    colliderSize
   );
   builder.colliders.push(colliderBox);
 
+  // The interaction point sits on the near side of the door (the side the
+  // player is actually standing on while approaching), i.e. opposite the
+  // direction of travel encoded by rotY.
   const forward = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY));
-  const interactPoint = new THREE.Vector3(x, 1.4, z).add(forward.clone().multiplyScalar(0.9));
+  const interactPoint = new THREE.Vector3(x, 1.4, z).add(forward.clone().multiplyScalar(-0.9));
 
   const doorDef = {
     id: `door_${doorIdCounter++}`,

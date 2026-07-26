@@ -51,6 +51,11 @@ export class Game {
     this.ambientLight = new THREE.AmbientLight(0x3a3420, 0.7);
     this.sceneManager.scene.add(this.ambientLight);
 
+    this.cameraMode = 'first';
+    this.playerAvatar = this._buildPlayerAvatar();
+    this.sceneManager.scene.add(this.playerAvatar);
+    this._camRaycaster = new THREE.Raycaster();
+
     this.state = 'menu';
     this.doorIndex = 1;
     this.seed = randomSeed();
@@ -108,6 +113,7 @@ export class Game {
     this.input.on('buildRemove', () => {
       if (this.state === 'playing') this.buildSystem.removeTargeted(this.currentChunk);
     });
+    this.input.on('toggleThirdPerson', () => this._toggleThirdPerson());
 
     this.player.onFootstep = (running, crouching) => {
       this.audio.footstep(this.sceneManager.camera, { running, crouching });
@@ -126,6 +132,63 @@ export class Game {
       this.input.exitPointerLock();
       this.ui.hud.notify('건축 모드 시작 - 원하는 크기를 정하고 G로 설치하세요.');
     }
+  }
+
+  // ---------------- camera mode (first/third person) ----------------
+
+  _buildPlayerAvatar() {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: 0x5b5347, roughness: 0.85 });
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.27, 1.0, 4, 8), mat);
+    body.position.y = 0.27 + 1.0 / 2;
+    body.castShadow = true;
+    group.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), mat);
+    head.position.y = 0.27 * 2 + 1.0 + 0.1;
+    head.castShadow = true;
+    group.add(head);
+    group.visible = false;
+    return group;
+  }
+
+  _toggleThirdPerson() {
+    if (this.state !== 'playing') return;
+    this.cameraMode = this.cameraMode === 'first' ? 'third' : 'first';
+    this.playerAvatar.visible = this.cameraMode === 'third';
+    this.audio.uiClick();
+    this.ui.hud.notify(this.cameraMode === 'third' ? '3인칭 시점' : '1인칭 시점');
+  }
+
+  // Called every frame after PlayerController has computed the normal
+  // first-person camera transform. In third-person mode this overrides the
+  // camera to a raycast-clamped boom behind the player so it doesn't clip
+  // through walls, and keeps the (otherwise invisible) player avatar
+  // synced to the player's position/facing so there's something to see.
+  _updateCameraMode() {
+    this.playerAvatar.position.set(this.player.position.x, this.player.position.y, this.player.position.z);
+    this.playerAvatar.rotation.y = this.player.yaw;
+
+    if (this.cameraMode !== 'third') return;
+    const cam = this.sceneManager.camera;
+    const headPos = new THREE.Vector3(this.player.position.x, this.player.position.y + this.player.height, this.player.position.z);
+    const forward = new THREE.Vector3(Math.sin(this.player.yaw), 0, Math.cos(this.player.yaw));
+
+    const desired = forward.clone().multiplyScalar(-3.2);
+    desired.y = 1.2 - Math.sin(this.player.pitch) * 1.4;
+    const maxDist = desired.length();
+    const dir = desired.clone().normalize();
+
+    let dist = maxDist;
+    if (this.currentChunk) {
+      this._camRaycaster.set(headPos, dir);
+      this._camRaycaster.far = maxDist + 0.3;
+      const hits = this._camRaycaster.intersectObject(this.currentChunk.group, true);
+      if (hits.length) dist = Math.max(0.5, hits[0].distance - 0.2);
+    }
+
+    cam.position.copy(headPos.clone().addScaledVector(dir, dist));
+    cam.rotation.set(0, 0, 0);
+    cam.lookAt(headPos.clone().addScaledVector(forward, 0.4));
   }
 
   _wireUI() {
@@ -557,6 +620,7 @@ export class Game {
     this.runTimeSec += dt;
     this.player.update(dt);
     this.flashlight.update(dt);
+    this._updateCameraMode();
     updateDoors(this.currentChunk?.doors || [], dt);
     this._scanInteractTarget();
     if (this.buildSystem.active) this.buildSystem.update(this.currentChunk);
