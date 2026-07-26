@@ -15,9 +15,19 @@ import { updateDoors, swingDoorOpen, markDoorFake } from '../rooms/DoorSystem.js
 import { HazardRunner } from '../rooms/Traps.js';
 import { EntityManager } from '../entities/EntityManager.js';
 import { UIManager } from '../ui/UIManager.js';
+import { BuildSystem } from './BuildSystem.js';
 
 const TOTAL_DOORS = 99;
 const INTERACT_RANGE = 1.6;
+const HIDE_SPOT_MESSAGES = {
+  wardrobe: '옷장 안에 몸을 숨겼다...',
+  locker: '락커 안에 몸을 숨겼다...',
+  cabinet: '캐비닛 뒤에 몸을 숨겼다...',
+  desk: '책상 아래로 몸을 숨겼다...',
+  boxes: '박스 더미 뒤에 몸을 숨겼다...',
+  bed: '침대 밑으로 몸을 숨겼다...',
+  vent: '환풍구 안에 몸을 숨겼다...'
+};
 
 export class Game {
   constructor(canvas) {
@@ -36,6 +46,7 @@ export class Game {
     this.flashlight = new FlashlightController(this.sceneManager.camera);
     this.inventory = new Inventory();
     this.entityManager = new EntityManager(this.sceneManager.scene);
+    this.buildSystem = new BuildSystem(this.sceneManager.scene, this.sceneManager.camera);
 
     this.ambientLight = new THREE.AmbientLight(0x3a3420, 0.7);
     this.sceneManager.scene.add(this.ambientLight);
@@ -62,6 +73,10 @@ export class Game {
     this.ui.showMainMenu(this.saveManager.hasSave());
     this._lastTime = performance.now();
     requestAnimationFrame(this._loop.bind(this));
+
+    this.saveManager.syncFromCloudIfEmpty().then((synced) => {
+      if (synced && this.state === 'menu') this.ui.showMainMenu(true);
+    });
   }
 
   // ---------------- setup ----------------
@@ -84,10 +99,33 @@ export class Game {
         this.audio.uiClick();
       }
     });
+    this.input.on('toggleBuild', () => this._toggleBuildMode());
+    this.input.on('buildPlace', () => {
+      if (this.state === 'playing' && this.buildSystem.place(this.currentChunk)) {
+        this.audio.uiClick();
+      }
+    });
+    this.input.on('buildRemove', () => {
+      if (this.state === 'playing') this.buildSystem.removeTargeted(this.currentChunk);
+    });
 
     this.player.onFootstep = (running, crouching) => {
       this.audio.footstep(this.sceneManager.camera, { running, crouching });
     };
+
+    this.ui.hud.setBuildCallback(({ w, h, d }) => this.buildSystem.setDimensions(w, h, d));
+  }
+
+  _toggleBuildMode() {
+    if (this.state !== 'playing') return;
+    const active = this.buildSystem.toggle();
+    this.ui.hud.setBuildPanelVisible(active);
+    if (active) {
+      // Free the cursor so the width/height/depth fields can be clicked;
+      // drag-to-look still works with the mouse button held.
+      this.input.exitPointerLock();
+      this.ui.hud.notify('건축 모드 시작 - 원하는 크기를 정하고 G로 설치하세요.');
+    }
   }
 
   _wireUI() {
@@ -206,6 +244,11 @@ export class Game {
       this.entityManager.clear();
     }
     this.audio.stopAllLoops();
+    this.buildSystem.reset();
+    if (this.buildSystem.active) {
+      this.buildSystem.toggle(false);
+      this.ui.hud.setBuildPanelVisible(false);
+    }
 
     const chunk = generateChunk(doorIndex, this.rng);
     this.sceneManager.scene.add(chunk.group);
@@ -349,6 +392,7 @@ export class Game {
     this.stats.recordHidden();
     this.achievements.unlock('first_hide');
     this.audio.breathing(0.5);
+    this.ui.hud.notify(HIDE_SPOT_MESSAGES[spot.kind] || '숨었다...');
   }
 
   _exitHiding() {
@@ -515,6 +559,7 @@ export class Game {
     this.flashlight.update(dt);
     updateDoors(this.currentChunk?.doors || [], dt);
     this._scanInteractTarget();
+    if (this.buildSystem.active) this.buildSystem.update(this.currentChunk);
 
     if (this.hazardRunner && !this.hazardRunner.done) {
       this.hazardRunner.update(dt, { sceneManager: this.sceneManager });

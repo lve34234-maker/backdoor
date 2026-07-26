@@ -26,6 +26,59 @@ export function createLocker(builder, x, z, rotY = 0) {
   return group;
 }
 
+// The primary hiding spot: a tall wooden wardrobe with two visible doors,
+// a cornice on top and small feet - the classic "closet you hide in".
+export function createWardrobe(builder, x, z, rotY = 0) {
+  const group = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a3220, roughness: 0.8 });
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x5a3d26, roughness: 0.7 });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x2e1f14, roughness: 0.9 });
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0xc9b98a, metalness: 0.6, roughness: 0.35 });
+
+  const width = 1.0, height = 2.05, depth = 0.58;
+
+  const carcass = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), bodyMat);
+  carcass.position.y = height / 2;
+  carcass.castShadow = true;
+  carcass.receiveShadow = true;
+  group.add(carcass);
+
+  // Cornice (top trim, slightly overhanging)
+  const cornice = new THREE.Mesh(new THREE.BoxGeometry(width + 0.08, 0.08, depth + 0.08), trimMat);
+  cornice.position.y = height + 0.04;
+  group.add(cornice);
+
+  // Two door panels with a visible centre seam
+  const doorW = width / 2 - 0.02;
+  const doorH = height - 0.16;
+  [-1, 1].forEach((side) => {
+    const door = new THREE.Mesh(new THREE.BoxGeometry(doorW, doorH, 0.04), doorMat);
+    door.position.set((side * doorW) / 2 + side * 0.01, height / 2, depth / 2 + 0.02);
+    group.add(door);
+
+    const handle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), metalMat);
+    handle.position.set(side * 0.06, height / 2, depth / 2 + 0.06);
+    group.add(handle);
+  });
+
+  // Small feet
+  const footGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([fx, fz]) => {
+    const foot = new THREE.Mesh(footGeo, trimMat);
+    foot.position.set(fx * (width / 2 - 0.08), 0.04, fz * (depth / 2 - 0.08));
+    group.add(foot);
+  });
+
+  group.position.set(x, 0, z);
+  group.rotation.y = rotY;
+  builder.addProp(group);
+
+  const facing = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY));
+  const spotPos = new THREE.Vector3(x, 1.0, z).add(facing.clone().multiplyScalar(0.55));
+  builder.addHidingSpot(spotPos, 'wardrobe', 1.15);
+  return group;
+}
+
 export function createCabinet(builder, x, z, rotY = 0) {
   const group = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.6, 0.55), woodMat());
@@ -109,12 +162,24 @@ export function createVent(builder, x, z, rotY = 0) {
   return grate;
 }
 
-export const HIDING_FACTORIES = [createLocker, createCabinet, createDeskHide, createBoxStack, createBedHide, createVent];
+export const HIDING_FACTORIES = [createLocker, createCabinet, createDeskHide, createBoxStack, createBedHide, createVent, createWardrobe];
+
+// The wardrobe ("옷장") is the signature hiding spot - it appears far more
+// often than the other furniture, which just adds variety.
+const WEIGHTED_HIDING_FACTORIES = [
+  { value: createWardrobe, weight: 5 },
+  { value: createLocker, weight: 1.2 },
+  { value: createCabinet, weight: 1 },
+  { value: createDeskHide, weight: 0.8 },
+  { value: createBoxStack, weight: 0.8 },
+  { value: createBedHide, weight: 0.6 },
+  { value: createVent, weight: 0.6 }
+];
 
 export function scatterHidingSpots(builder, rng, spots) {
   // spots: [{x,z,rotY}]
   spots.forEach(({ x, z, rotY = 0 }) => {
-    const factory = rng.pick(HIDING_FACTORIES);
+    const factory = rng.weightedPick(WEIGHTED_HIDING_FACTORIES);
     factory(builder, x, z, rotY);
   });
 }

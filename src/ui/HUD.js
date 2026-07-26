@@ -4,7 +4,7 @@ export class HUD {
   constructor(root) {
     this.root = root;
     this.root.innerHTML = `
-      <div id="hud" class="ui-layer" style="display:none">
+      <div id="hud" style="display:none">
         <div class="hud-top-left">
           <div class="hud-door-number" id="hud-door">Door 01</div>
           <div class="hud-objective" id="hud-objective">문을 찾아 다음 구역으로 이동하세요.</div>
@@ -32,6 +32,13 @@ export class HUD {
         </div>
         <div class="hud-interact-prompt" id="hud-interact"></div>
         <div class="hud-notifications" id="hud-notifications"></div>
+        <div id="build-panel" style="display:none">
+          <div class="build-panel-title">건축 모드</div>
+          <div class="build-row"><span>가로 (W)</span><input type="number" id="build-w" min="0.2" max="4" step="0.1" value="1"></div>
+          <div class="build-row"><span>높이 (H)</span><input type="number" id="build-h" min="0.2" max="4" step="0.1" value="1"></div>
+          <div class="build-row"><span>깊이 (D)</span><input type="number" id="build-d" min="0.2" max="4" step="0.1" value="1"></div>
+          <div class="build-hint">G 설치 · H 제거 · B 종료</div>
+        </div>
       </div>
       <div id="vignette" style="display:none"></div>
       <div id="damage-flash"></div>
@@ -60,8 +67,28 @@ export class HUD {
     this.notifications = new Notifications(document.getElementById('hud-notifications'));
     this.achievements = new AchievementToasts(document.getElementById('achv-toast-root'));
 
+    this.buildPanelEl = document.getElementById('build-panel');
+    this.buildWInput = document.getElementById('build-w');
+    this.buildHInput = document.getElementById('build-h');
+    this.buildDInput = document.getElementById('build-d');
+
     this._fpsTimer = 0;
     this._fpsFrames = 0;
+  }
+
+  setBuildCallback(onChange) {
+    const emit = () => onChange({
+      w: parseFloat(this.buildWInput.value) || 1,
+      h: parseFloat(this.buildHInput.value) || 1,
+      d: parseFloat(this.buildDInput.value) || 1
+    });
+    this.buildWInput.addEventListener('input', emit);
+    this.buildHInput.addEventListener('input', emit);
+    this.buildDInput.addEventListener('input', emit);
+  }
+
+  setBuildPanelVisible(visible) {
+    this.buildPanelEl.style.display = visible ? 'flex' : 'none';
   }
 
   setVisible(visible) {

@@ -26,6 +26,7 @@ export class ChunkBuilder {
     this._ceilMat = new THREE.MeshStandardMaterial({ map: ceilingTexture(), roughness: 0.8 });
     this._floorMat = new THREE.MeshStandardMaterial({ map: carpetTexture(Math.floor(rng.next() * 1000)), roughness: 1 });
     this._metalMat = new THREE.MeshStandardMaterial({ map: metalTexture(), roughness: 0.6, metalness: 0.4 });
+    this._baseboardMat = new THREE.MeshStandardMaterial({ color: 0x2e2712, roughness: 0.85 });
   }
 
   addFloor(x0, z0, x1, z1) {
@@ -56,6 +57,17 @@ export class ChunkBuilder {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     this.group.add(mesh);
+
+    // Baseboard trim along the floor line - a small detail that keeps the
+    // wall/floor junction from looking flat and untextured up close.
+    if (h === WALL_HEIGHT) {
+      const baseboard = new THREE.Mesh(
+        new THREE.BoxGeometry(w + 0.02, 0.11, d + 0.02),
+        this._baseboardMat
+      );
+      baseboard.position.set(cx, 0.055, cz);
+      this.group.add(baseboard);
+    }
 
     const box = new THREE.Box3().setFromCenterAndSize(
       new THREE.Vector3(cx, h / 2, cz),

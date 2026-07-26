@@ -3,8 +3,12 @@ import { ChunkBuilder, CORRIDOR_WIDTH } from './ChunkBuilder.js';
 import { carveCorridor, carveRoomRect, carveMaze, emitWallsFromGrid, cellCenterWorld } from './GridWorld.js';
 import { Grid } from '../system/Pathfinding.js';
 import { createDoor, createFakeDoorPair } from './DoorSystem.js';
-import { scatterHidingSpots, createLocker, createCabinet, createBoxStack } from './HidingSpots.js';
+import { scatterHidingSpots, createWardrobe, createBoxStack } from './HidingSpots.js';
 import { pickHazard } from './Traps.js';
+
+// Doors 1 and 2 are always entity-free so a new player can learn the
+// controls (movement, doors, hiding) before anything starts hunting them.
+const SAFE_DOORS = 3;
 
 const ENTITY_WEIGHTS_BY_DANGER = (danger) => [
   { value: null, weight: Math.max(0.4, 3.2 - danger * 2.4) },
@@ -72,15 +76,17 @@ function placeItemsAndEntity(builder, grid, originX, originZ, rng, doorIndex, op
     }
   }
 
-  // Entity spawn
-  const entityType = rng.weightedPick(ENTITY_WEIGHTS_BY_DANGER(danger));
-  if (entityType && !opts.forceNoEntity) {
+  // Entity spawn - the first couple of doors are kept safe so new players
+  // get a feel for movement/doors before anything starts hunting them.
+  const entitiesAllowed = doorIndex >= SAFE_DOORS;
+  const entityType = entitiesAllowed ? rng.weightedPick(ENTITY_WEIGHTS_BY_DANGER(danger)) : null;
+  if (entitiesAllowed && entityType && !opts.forceNoEntity) {
     const cell = randomWalkableFarCell(grid, entryCell.x, entryCell.z, 5, rng);
     if (cell) {
       const world = cellCenterWorld(cell.cx, cell.cz, originX, originZ, grid.cellSize);
       builder.entitySpawn = { type: entityType, position: new THREE.Vector3(world.x, 0, world.z) };
     }
-  } else if (opts.forceEntity) {
+  } else if (entitiesAllowed && opts.forceEntity) {
     const cell = randomWalkableFarCell(grid, entryCell.x, entryCell.z, 5, rng);
     if (cell) {
       const world = cellCenterWorld(cell.cx, cell.cz, originX, originZ, grid.cellSize);
@@ -89,6 +95,23 @@ function placeItemsAndEntity(builder, grid, originX, originZ, rng, doorIndex, op
   }
 
   return { lockedExit };
+}
+
+// Rejection-sampling helper so furniture placed in the same room doesn't
+// end up stacked on top of / overlapping each other.
+function pickSpacedPoint(rng, x0, z0, w, h, margin, minDist, placed) {
+  let best = null;
+  for (let tries = 0; tries < 20; tries++) {
+    const rx = x0 + rng.range(margin, Math.max(margin + 0.01, w - margin));
+    const rz = z0 + rng.range(margin, Math.max(margin + 0.01, h - margin));
+    if (placed.every((p) => Math.hypot(rx - p.x, rz - p.z) >= minDist)) {
+      best = { rx, rz };
+      break;
+    }
+    best = { rx, rz };
+  }
+  placed.push({ x: best.rx, z: best.rz });
+  return best;
 }
 
 function addPickupMesh(builder, x, z, type) {
@@ -146,7 +169,7 @@ function buildCorridorChunk(rng, doorIndex) {
     const spotZ = rng.range(4, Math.max(5, length1 - 3));
     const side = rng.bool(0.5) ? -1 : 1;
     const c = cellCenterWorld(marginX + side * (CORRIDOR_WIDTH / 2 - 0.5), spotZ, originX, originZ, 1);
-    createLocker(builder, c.x, c.z, side === 1 ? -Math.PI / 2 : Math.PI / 2);
+    createWardrobe(builder, c.x, c.z, side === 1 ? -Math.PI / 2 : Math.PI / 2);
   }
 
   builder.playerSpawn = { x: 0, y: 0, z: 0.6, yaw: 0 };
@@ -194,20 +217,21 @@ function buildRoomChunk(rng, doorIndex, { hiding = false } = {}) {
     builder.addFluorescentLight(c.x, c.z, { intensity: hiding ? 0.85 : 1.0 });
   }
 
-  // Furniture / hiding spots scattered inside the room
-  const spotCount = hiding ? rng.int(4, 6) : rng.int(1, 3);
+  // Furniture / hiding spots scattered inside the room, spaced apart so
+  // they never overlap or crowd into a cluttered pile.
+  const furnitureMinDist = 2.4;
+  const placedFurniture = [];
+  const spotCount = hiding ? rng.int(3, 5) : rng.int(1, 2);
   const spots = [];
   for (let i = 0; i < spotCount; i++) {
-    const rx = roomX0 + rng.range(1.2, roomW - 1.2);
-    const rz = roomZ0 + rng.range(1.2, roomH - 1.2);
+    const { rx, rz } = pickSpacedPoint(rng, roomX0, roomZ0, roomW, roomH, 1.4, furnitureMinDist, placedFurniture);
     const c = cellCenterWorld(rx, rz, originX, originZ, 1);
     spots.push({ x: c.x, z: c.z, rotY: rng.range(0, Math.PI * 2) });
   }
   scatterHidingSpots(builder, rng, spots);
 
   if (rng.bool(0.5)) {
-    const rx = roomX0 + rng.range(1, roomW - 1);
-    const rz = roomZ0 + rng.range(1, roomH - 1);
+    const { rx, rz } = pickSpacedPoint(rng, roomX0, roomZ0, roomW, roomH, 1.2, furnitureMinDist, placedFurniture);
     const c = cellCenterWorld(rx, rz, originX, originZ, 1);
     createBoxStack(builder, c.x, c.z);
   }
@@ -271,7 +295,7 @@ function buildMazeChunk(rng, doorIndex) {
     if (!rng.bool(0.5)) return;
     const o = maze.roomOrigin(cell[0], cell[1]);
     const c = cellCenterWorld(o.x + roomSize / 2, o.y + roomSize / 2, originX, originZ, 1);
-    createCabinet(builder, c.x, c.z, rng.range(0, Math.PI * 2));
+    createWardrobe(builder, c.x, c.z, rng.range(0, Math.PI * 2));
   });
 
   builder.playerSpawn = { x: 0, y: 0, z: 0.6, yaw: 0 };

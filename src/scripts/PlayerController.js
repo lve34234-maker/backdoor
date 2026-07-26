@@ -79,7 +79,9 @@ export class PlayerController {
     this.noiseLevel = wantsCrouch ? 0.15 : this.isSprinting ? 1.0 : moving ? 0.5 : 0.0;
 
     const forward = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
-    const right = new THREE.Vector3(Math.sin(this.yaw + Math.PI / 2), 0, Math.cos(this.yaw + Math.PI / 2));
+    // Must match the camera's actual world-space right vector (see the
+    // +PI reconciliation in _syncCamera) or A/D strafe backwards.
+    const right = new THREE.Vector3(-Math.cos(this.yaw), 0, Math.sin(this.yaw));
 
     const move = new THREE.Vector3();
     if (this.input.forward) move.add(forward);
