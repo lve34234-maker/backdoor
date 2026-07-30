@@ -129,6 +129,12 @@ export class Game {
     this.input.on('buildRemove', () => {
       if (this.state === 'playing') this.buildSystem.removeTargeted(this.currentChunk);
     });
+    this.input.on('buildUndo', () => {
+      if (this.state === 'playing' && this.buildSystem.undoLast(this.currentChunk)) {
+        this.audio.uiClick();
+        this.ui.hud.notify('마지막 건축물을 되돌렸습니다.');
+      }
+    });
     this.input.on('toggleThirdPerson', () => this._toggleThirdPerson());
     this.input.on('toggleInventory', () => this._toggleInventoryPanel());
 

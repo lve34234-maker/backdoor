@@ -18,7 +18,7 @@ export class InputManager {
     this._lastDragY = 0;
     this.listeners = {
       interact: [], toggleHide: [], escape: [], toggleFlashlight: [], toggleInventory: [],
-      toggleBuild: [], buildPlace: [], buildRemove: [], toggleThirdPerson: []
+      toggleBuild: [], buildPlace: [], buildRemove: [], buildUndo: [], toggleThirdPerson: []
     };
 
     this._onKeyDown = this._onKeyDown.bind(this);
@@ -117,6 +117,7 @@ export class InputManager {
     if (e.code === 'KeyV') this._emit('toggleBuild');
     if (e.code === 'KeyG') this._emit('buildPlace');
     if (e.code === 'KeyH') this._emit('buildRemove');
+    if (e.code === 'KeyP') this._emit('buildUndo');
     if (e.code === 'Tab') { e.preventDefault(); this._emit('toggleInventory'); }
   }
 

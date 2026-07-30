@@ -39,7 +39,7 @@ export class HUD {
           <div class="build-row"><span>가로 (W)</span><input type="number" id="build-w" min="0.2" max="4" step="0.1" value="1"></div>
           <div class="build-row"><span>높이 (H)</span><input type="number" id="build-h" min="0.2" max="4" step="0.1" value="1"></div>
           <div class="build-row"><span>깊이 (D)</span><input type="number" id="build-d" min="0.2" max="4" step="0.1" value="1"></div>
-          <div class="build-hint">G 설치 · H 제거 · V 종료</div>
+          <div class="build-hint">G 설치 · H 제거 · P 되돌리기 · V 종료</div>
         </div>
         <div id="inventory-panel" style="display:none">
           <div class="inv-panel-title">인벤토리</div>
@@ -83,6 +83,7 @@ export class HUD {
     this.inventoryPanelEl = document.getElementById('inventory-panel');
     this.inventoryGridEl = document.getElementById('inv-panel-grid');
     this.inventoryPanelVisible = false;
+    this._invPanelSignature = null;
     this._onUseItem = null;
     this.inventoryGridEl.addEventListener('click', (e) => {
       const btn = e.target.closest('.inv-use-btn');
@@ -100,9 +101,19 @@ export class HUD {
   setInventoryPanelVisible(visible) {
     this.inventoryPanelVisible = visible;
     this.inventoryPanelEl.style.display = visible ? 'flex' : 'none';
+    if (visible) this._invPanelSignature = null; // force a fresh render on open
   }
 
   renderInventoryPanel(items) {
+    // A real click spans several animation frames between mousedown and
+    // mouseup; rebuilding this innerHTML every frame (as update() used to)
+    // replaces the "사용" button mid-gesture, so mouseup lands on a brand
+    // new element and the browser never fires 'click'. Skip the rebuild
+    // whenever the grouped contents haven't actually changed.
+    const signature = items.map((item) => item.type).sort().join(',');
+    if (signature === this._invPanelSignature) return;
+    this._invPanelSignature = signature;
+
     if (!items.length) {
       this.inventoryGridEl.innerHTML = '<p class="inv-panel-empty">아직 아무것도 없다.</p>';
       return;

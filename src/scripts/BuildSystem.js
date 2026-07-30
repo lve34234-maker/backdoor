@@ -125,8 +125,18 @@ export class BuildSystem {
     const hits = this.raycaster.intersectObjects(this.placed.map((p) => p.mesh), false);
     if (!hits.length) return false;
     const idx = this.placed.findIndex((p) => p.mesh === hits[0].object);
-    if (idx === -1) return false;
+    return this._removeAt(chunk, idx);
+  }
 
+  // Undo the most recently placed block regardless of where the camera is
+  // aiming - a plain Ctrl/Z-style "oops" key rather than an aimed removal.
+  undoLast(chunk) {
+    if (!chunk || !this.placed.length) return false;
+    return this._removeAt(chunk, this.placed.length - 1);
+  }
+
+  _removeAt(chunk, idx) {
+    if (idx === -1 || idx == null || !this.placed[idx]) return false;
     const entry = this.placed[idx];
     chunk.group.remove(entry.mesh);
     entry.mesh.geometry.dispose();
