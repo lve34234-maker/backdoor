@@ -439,6 +439,27 @@ html, body {
   padding: 0.5rem 0.7rem;
 }
 
+.inv-panel-info {
+  flex: 1;
+}
+
+.inv-use-btn {
+  background: transparent;
+  border: 1px solid var(--bd-yellow-dim);
+  color: var(--bd-yellow);
+  font-family: inherit;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.inv-use-btn:hover {
+  background: rgba(214, 195, 75, 0.15);
+  border-color: var(--bd-yellow);
+}
+
 .inv-panel-icon {
   font-size: 1.3rem;
   width: 1.6rem;

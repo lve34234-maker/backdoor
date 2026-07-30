@@ -17,6 +17,7 @@ import { EntityManager } from '../entities/EntityManager.js';
 import { UIManager } from '../ui/UIManager.js';
 import { BuildSystem } from './BuildSystem.js';
 import { TOTAL_DOORS, FINAL_DOOR_INDEX, dangerFactor, basementFloor } from '../rooms/Difficulty.js';
+import { ITEM_DEFS, DRAWER_LOOT_ITEMS, USABLE_ITEM_TYPES } from './ItemDefs.js';
 
 const INTERACT_RANGE = 1.6;
 const HIDE_SPOT_MESSAGES = {
@@ -29,24 +30,18 @@ const HIDE_SPOT_MESSAGES = {
   vent: '환풍구 안에 몸을 숨겼다...'
 };
 
-// Every item type the player can find, either on the floor or by
-// searching a drawer. "key" is the only one placed deliberately (tied to
-// locked doors); everything else can turn up as random drawer loot.
-const ITEM_DEFS = {
-  battery: { label: '배터리', icon: '🔋' },
-  health: { label: '구급 키트', icon: '✚' },
-  bandage: { label: '붕대', icon: '🩹' },
-  snack: { label: '에너지바', icon: '🍫' },
-  water: { label: '생수', icon: '💧' },
-  energy_drink: { label: '에너지 드링크', icon: '🥤' },
-  lighter: { label: '라이터', icon: '🔥' },
-  key: { label: '열쇠', icon: '🔑' },
-  photo: { label: '오래된 사진', icon: '📷', flavor: '누군가의 웃는 얼굴... 여기와는 어울리지 않는다.' },
-  cassette: { label: '카세트 테이프', icon: '📼', flavor: '잡음 속에서 희미한 목소리가 들리는 것 같다.' },
-  map_fragment: { label: '지도 조각', icon: '🗺️', flavor: '출구로 가는 단서일지도 모른다.' },
-  compass: { label: '나침반', icon: '🧭', flavor: '바늘이 미세하게 떨리며 계속 돈다.' }
+// What each usable item actually does when consumed from the inventory
+// panel (see _useInventoryItem). Keys and collectibles have no entry here
+// - they're not manually "used".
+const CONSUMABLE_EFFECTS = {
+  battery: (game) => { game.flashlight.addBattery(35); game.ui.hud.notify('배터리로 손전등을 충전했다.'); },
+  health: (game) => { game.player.heal(30); game.ui.hud.notify('구급 키트를 사용했다.'); },
+  bandage: (game) => { game.player.heal(15); game.ui.hud.notify('붕대로 상처를 감쌌다.'); },
+  snack: (game) => { game.player.stamina = 100; game.ui.hud.notify('에너지바를 먹었다. 기운이 난다.'); },
+  water: (game) => { game.player.stamina = Math.min(100, game.player.stamina + 40); game.ui.hud.notify('생수를 마셨다.'); },
+  energy_drink: (game) => { game.player.stamina = 100; game.ui.hud.notify('에너지 드링크를 마셨다! 스태미나가 가득 찼다.'); },
+  lighter: (game) => { game.flashlight.addBattery(20); game.ui.hud.notify('라이터로 손전등을 충전했다.'); }
 };
-const DRAWER_LOOT_ITEMS = ['battery', 'health', 'bandage', 'snack', 'water', 'energy_drink', 'lighter', 'photo', 'cassette', 'map_fragment', 'compass'];
 
 export class Game {
   constructor(canvas) {
@@ -142,6 +137,7 @@ export class Game {
     };
 
     this.ui.hud.setBuildCallback(({ w, h, d }) => this.buildSystem.setDimensions(w, h, d));
+    this.ui.hud.setUseItemCallback((type) => this._useInventoryItem(type));
   }
 
   _toggleBuildMode() {
@@ -544,52 +540,38 @@ export class Game {
     this._applyItemEffect(item.type, item.id);
   }
 
-  // Shared by floor pickups and drawer loot: applies whatever the item type
-  // does (heal, refill stamina, add battery, or just go into the inventory
-  // as a key/collectible) and shows the matching notification.
+  // Shared by floor pickups and drawer loot: every item type - consumable,
+  // key, or collectible - goes straight into the inventory (Tab) rather
+  // than being auto-applied. Consumables are then used on demand from the
+  // inventory panel (see _useInventoryItem).
   _applyItemEffect(type, id) {
     const def = ITEM_DEFS[type] || { label: type, icon: '?' };
     this.stats.recordItemCollected();
     this.audio.pickupChime();
 
-    switch (type) {
-      case 'battery':
-        this.flashlight.addBattery(35);
-        this.ui.hud.notify('배터리를 획득했다.');
-        break;
-      case 'health':
-        this.player.heal(30);
-        this.ui.hud.notify('구급 키트를 사용했다.');
-        break;
-      case 'bandage':
-        this.player.heal(15);
-        this.ui.hud.notify('붕대로 상처를 감쌌다.');
-        break;
-      case 'snack':
-        this.player.stamina = 100;
-        this.ui.hud.notify('에너지바를 먹었다. 기운이 난다.');
-        break;
-      case 'water':
-        this.player.stamina = Math.min(100, this.player.stamina + 40);
-        this.ui.hud.notify('생수를 마셨다.');
-        break;
-      case 'energy_drink':
-        this.player.stamina = 100;
-        this.ui.hud.notify('에너지 드링크를 마셨다! 스태미나가 가득 찼다.');
-        break;
-      case 'lighter':
-        this.flashlight.addBattery(20);
-        this.ui.hud.notify('라이터를 발견했다.');
-        break;
-      case 'key':
-        this.inventory.add({ type: 'key', label: '열쇠', id: id || `key_${Date.now()}` });
-        this.ui.hud.notify('열쇠를 획득했다.');
-        break;
-      default:
-        this.inventory.add({ type, label: def.label, id: id || `${type}_${Date.now()}`, flavor: def.flavor });
-        this.ui.hud.notify(`${def.label}을(를) 발견했다.${def.flavor ? ` ${def.flavor}` : ''}`);
-        break;
+    const added = this.inventory.add({ type, label: def.label, id: id || `${type}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, flavor: def.flavor });
+    if (!added) {
+      this.ui.hud.notify('인벤토리가 가득 찼다!');
+      return;
     }
+
+    if (type === 'key') {
+      this.ui.hud.notify('열쇠를 획득했다.');
+    } else if (USABLE_ITEM_TYPES.has(type)) {
+      this.ui.hud.notify(`${def.label}을(를) 획득했다. (Tab에서 사용)`);
+    } else {
+      this.ui.hud.notify(`${def.label}을(를) 발견했다.${def.flavor ? ` ${def.flavor}` : ''}`);
+    }
+  }
+
+  // Called when the player clicks "사용" on an item in the Tab inventory
+  // panel. Keys and collectibles have no manual use action.
+  _useInventoryItem(type) {
+    const effect = CONSUMABLE_EFFECTS[type];
+    if (!effect) return;
+    if (!this.inventory.removeOne(type)) return;
+    effect(this);
+    this.audio.uiClick();
   }
 
   _searchDrawer(spot) {

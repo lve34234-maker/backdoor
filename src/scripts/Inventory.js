@@ -1,4 +1,8 @@
-const MAX_SLOTS = 12;
+// Every pickup now goes into the inventory (consumables are used on demand
+// rather than instantly), so this needs real headroom - the HUD panel
+// displays same-type items grouped with a count, so a generous raw cap
+// here doesn't clutter anything.
+const MAX_SLOTS = 30;
 
 export class Inventory {
   constructor() {

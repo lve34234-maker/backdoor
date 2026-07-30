@@ -1,4 +1,5 @@
 import { Notifications, AchievementToasts } from './Notifications.js';
+import { ITEM_DEFS, USABLE_ITEM_TYPES } from '../scripts/ItemDefs.js';
 
 export class HUD {
   constructor(root) {
@@ -82,9 +83,18 @@ export class HUD {
     this.inventoryPanelEl = document.getElementById('inventory-panel');
     this.inventoryGridEl = document.getElementById('inv-panel-grid');
     this.inventoryPanelVisible = false;
+    this._onUseItem = null;
+    this.inventoryGridEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.inv-use-btn');
+      if (btn && this._onUseItem) this._onUseItem(btn.dataset.type);
+    });
 
     this._fpsTimer = 0;
     this._fpsFrames = 0;
+  }
+
+  setUseItemCallback(cb) {
+    this._onUseItem = cb;
   }
 
   setInventoryPanelVisible(visible) {
@@ -110,6 +120,7 @@ export class HUD {
           <div class="inv-panel-label">${item.label}${item.count > 1 ? ` x${item.count}` : ''}</div>
           ${item.flavor ? `<div class="inv-panel-flavor">${item.flavor}</div>` : ''}
         </div>
+        ${USABLE_ITEM_TYPES.has(item.type) ? `<button class="inv-use-btn" data-type="${item.type}">사용</button>` : ''}
       </div>
     `).join('');
   }
@@ -196,14 +207,8 @@ export class HUD {
   }
 }
 
-const ICONS = {
-  key: '🔑', battery: '🔋', health: '✚', bandage: '🩹', snack: '🍫',
-  water: '💧', energy_drink: '🥤', lighter: '🔥',
-  photo: '📷', cassette: '📼', map_fragment: '🗺️', compass: '🧭'
-};
-
 function iconFor(type) {
-  return ICONS[type] || '?';
+  return ITEM_DEFS[type]?.icon || '?';
 }
 
 function jumpscareSVG() {
