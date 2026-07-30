@@ -77,11 +77,29 @@ export class InputManager {
   }
 
   exitPointerLock() {
-    if (document.pointerLockElement) document.exitPointerLock();
+    if (document.pointerLockElement) {
+      // Tag this as an exit *we* asked for, so the pointerlockchange
+      // handler below doesn't mistake it for the user's Escape key.
+      this._manualUnlock = true;
+      document.exitPointerLock();
+    }
   }
 
   _onPointerLockChange() {
+    const wasLocked = this.pointerLocked;
     this.pointerLocked = document.pointerLockElement === this.domElement;
+    if (wasLocked && !this.pointerLocked) {
+      if (this._manualUnlock) {
+        this._manualUnlock = false;
+      } else {
+        // The browser reserves Escape to release Pointer Lock itself and
+        // never delivers it as a normal keydown while locked, so this is
+        // the only way to notice the player pressed it - without this,
+        // the very first Escape press would silently just free the
+        // cursor instead of opening the pause menu.
+        this._emit('escape');
+      }
+    }
   }
 
   _onKeyDown(e) {

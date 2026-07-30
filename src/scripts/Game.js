@@ -157,6 +157,11 @@ export class Game {
     this.inventoryPanelOpen = !this.inventoryPanelOpen;
     this.ui.hud.setInventoryPanelVisible(this.inventoryPanelOpen);
     this.audio.uiClick();
+    if (this.inventoryPanelOpen) {
+      // Free the cursor so the "사용" buttons can actually be clicked;
+      // same reasoning as the build panel.
+      this.input.exitPointerLock();
+    }
   }
 
   // ---------------- camera mode (first/third person) ----------------
