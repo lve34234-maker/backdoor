@@ -116,7 +116,9 @@ export class ChunkBuilder {
   // something the player can press E on once to roll for loot (coins or a
   // random item).
   addSearchable(position, kind, radius = 1.1) {
-    this.searchables.push({ position: position.clone(), kind, radius, searched: false });
+    const entry = { position: position.clone(), kind, radius, searched: false };
+    this.searchables.push(entry);
+    return entry;
   }
 
   addItem(position, type, extra = {}) {

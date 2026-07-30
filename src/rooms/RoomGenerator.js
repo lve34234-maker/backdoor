@@ -71,11 +71,21 @@ function placeItemsAndEntity(builder, grid, originX, originZ, rng, doorIndex, op
   let lockedExit = false;
   if (opts.allowLock && rng.bool(0.06 + danger * 0.08)) {
     lockedExit = true;
-    const cell = randomWalkableFarCell(grid, entryCell.x, entryCell.z, 3, rng);
-    if (cell) {
-      const world = cellCenterWorld(cell.cx, cell.cz, originX, originZ, grid.cellSize);
-      addPickupMesh(builder, world.x, world.z, 'key');
+    // Hide the key inside a drawer rather than leaving it out in plain
+    // sight - tag one of this chunk's drawers (making one first if it
+    // doesn't have any yet) to guarantee a search there turns it up.
+    let keyDrawer = builder.searchables.length
+      ? rng.pick(builder.searchables)
+      : null;
+    if (!keyDrawer) {
+      const cell = randomWalkableFarCell(grid, entryCell.x, entryCell.z, 3, rng);
+      if (cell) {
+        const world = cellCenterWorld(cell.cx, cell.cz, originX, originZ, grid.cellSize);
+        createDrawer(builder, world.x, world.z, rng.range(0, Math.PI * 2));
+        keyDrawer = builder.searchables[builder.searchables.length - 1];
+      }
     }
+    if (keyDrawer) keyDrawer.guaranteedLoot = 'key';
   }
 
   // Entity spawn - the first couple of doors are kept safe so new players

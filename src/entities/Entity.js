@@ -174,23 +174,29 @@ export class Entity {
         ctx.audio?.entityGrowl(this.mesh, 1 + Math.random() * 0.3);
       }
     } else if (this.state === 'chase') {
-      this.lastKnownPlayerPos = ctx.player.position.clone();
+      // Only refresh the pursuit target while the player is actually
+      // detected right now - e.g. hidden in a wardrobe - so the entity
+      // heads for (and eventually gives up at) where it last saw them
+      // instead of continuously homing in on their live, hidden position.
+      const detectedNow = this._canDetect(ctx);
+      if (detectedNow) {
+        this.lastKnownPlayerPos = ctx.player.position.clone();
+        this.loseTrackTimer = this.def.giveUpTime;
+      } else {
+        this.loseTrackTimer -= dt;
+      }
+
       if (this.repathTimer <= 0) {
         this.repathTimer = REPATH_INTERVAL;
-        this._repath(ctx, ctx.player.position);
+        this._repath(ctx, this.lastKnownPlayerPos || ctx.player.position);
       }
       this._followPath(dt, this.def.speedChase);
       this._checkContact(ctx);
 
-      if (this._canDetect(ctx)) {
-        this.loseTrackTimer = this.def.giveUpTime;
-      } else {
-        this.loseTrackTimer -= dt;
-        if (this.loseTrackTimer <= 0) {
-          this.state = 'search';
-          this.stateTimer = 4;
-          this._repath(ctx, this.lastKnownPlayerPos);
-        }
+      if (!detectedNow && this.loseTrackTimer <= 0) {
+        this.state = 'search';
+        this.stateTimer = 4;
+        this._repath(ctx, this.lastKnownPlayerPos);
       }
     } else if (this.state === 'search') {
       this.stateTimer -= dt;
@@ -226,9 +232,10 @@ export class Entity {
     } else if (this.state === 'revealed') {
       this.stateTimer -= dt;
       this.repathTimer -= dt;
+      if (!ctx.player.isHidden) this.lastKnownPlayerPos = ctx.player.position.clone();
       if (this.repathTimer <= 0) {
         this.repathTimer = REPATH_INTERVAL;
-        this._repath(ctx, ctx.player.position);
+        this._repath(ctx, this.lastKnownPlayerPos || ctx.player.position);
       }
       this._followPath(dt, this.def.speedChase);
       this._checkContact(ctx);

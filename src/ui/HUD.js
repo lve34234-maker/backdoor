@@ -40,6 +40,11 @@ export class HUD {
           <div class="build-row"><span>깊이 (D)</span><input type="number" id="build-d" min="0.2" max="4" step="0.1" value="1"></div>
           <div class="build-hint">G 설치 · H 제거 · V 종료</div>
         </div>
+        <div id="inventory-panel" style="display:none">
+          <div class="inv-panel-title">인벤토리</div>
+          <div id="inv-panel-grid" class="inv-panel-grid"></div>
+          <div class="inv-panel-hint">Tab 닫기</div>
+        </div>
       </div>
       <div id="vignette" style="display:none"></div>
       <div id="damage-flash"></div>
@@ -74,8 +79,39 @@ export class HUD {
     this.buildHInput = document.getElementById('build-h');
     this.buildDInput = document.getElementById('build-d');
 
+    this.inventoryPanelEl = document.getElementById('inventory-panel');
+    this.inventoryGridEl = document.getElementById('inv-panel-grid');
+    this.inventoryPanelVisible = false;
+
     this._fpsTimer = 0;
     this._fpsFrames = 0;
+  }
+
+  setInventoryPanelVisible(visible) {
+    this.inventoryPanelVisible = visible;
+    this.inventoryPanelEl.style.display = visible ? 'flex' : 'none';
+  }
+
+  renderInventoryPanel(items) {
+    if (!items.length) {
+      this.inventoryGridEl.innerHTML = '<p class="inv-panel-empty">아직 아무것도 없다.</p>';
+      return;
+    }
+    const grouped = new Map();
+    items.forEach((item) => {
+      const key = item.type;
+      if (!grouped.has(key)) grouped.set(key, { ...item, count: 0 });
+      grouped.get(key).count += 1;
+    });
+    this.inventoryGridEl.innerHTML = [...grouped.values()].map((item) => `
+      <div class="inv-panel-entry">
+        <div class="inv-panel-icon">${iconFor(item.type)}</div>
+        <div class="inv-panel-info">
+          <div class="inv-panel-label">${item.label}${item.count > 1 ? ` x${item.count}` : ''}</div>
+          ${item.flavor ? `<div class="inv-panel-flavor">${item.flavor}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
   }
 
   setBuildCallback(onChange) {
@@ -126,6 +162,7 @@ export class HUD {
 
     if (state.inventory) {
       this.inventoryEl.innerHTML = state.inventory.map((item) => `<div class="inv-slot" title="${item.label}">${iconFor(item.type)}</div>`).join('');
+      if (this.inventoryPanelVisible) this.renderInventoryPanel(state.inventory);
     }
 
     if (state.coins != null) this.coinsEl.textContent = state.coins;

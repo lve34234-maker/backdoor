@@ -74,6 +74,7 @@ export class Game {
     this.playerAvatar = this._buildPlayerAvatar();
     this.sceneManager.scene.add(this.playerAvatar);
     this._camRaycaster = new THREE.Raycaster();
+    this.inventoryPanelOpen = false;
 
     this.state = 'menu';
     this.doorIndex = 1;
@@ -134,6 +135,7 @@ export class Game {
       if (this.state === 'playing') this.buildSystem.removeTargeted(this.currentChunk);
     });
     this.input.on('toggleThirdPerson', () => this._toggleThirdPerson());
+    this.input.on('toggleInventory', () => this._toggleInventoryPanel());
 
     this.player.onFootstep = (running, crouching) => {
       this.audio.footstep(this.sceneManager.camera, { running, crouching });
@@ -152,6 +154,13 @@ export class Game {
       this.input.exitPointerLock();
       this.ui.hud.notify('건축 모드 시작 - 원하는 크기를 정하고 G로 설치하세요.');
     }
+  }
+
+  _toggleInventoryPanel() {
+    if (this.state !== 'playing') return;
+    this.inventoryPanelOpen = !this.inventoryPanelOpen;
+    this.ui.hud.setInventoryPanelVisible(this.inventoryPanelOpen);
+    this.audio.uiClick();
   }
 
   // ---------------- camera mode (first/third person) ----------------
@@ -577,7 +586,7 @@ export class Game {
         this.ui.hud.notify('열쇠를 획득했다.');
         break;
       default:
-        this.inventory.add({ type, label: def.label, id: id || `${type}_${Date.now()}` });
+        this.inventory.add({ type, label: def.label, id: id || `${type}_${Date.now()}`, flavor: def.flavor });
         this.ui.hud.notify(`${def.label}을(를) 발견했다.${def.flavor ? ` ${def.flavor}` : ''}`);
         break;
     }
@@ -590,6 +599,11 @@ export class Game {
     }
     spot.searched = true;
     this.audio.uiClick();
+
+    if (spot.guaranteedLoot) {
+      this._applyItemEffect(spot.guaranteedLoot);
+      return;
+    }
 
     const roll = Math.random();
     if (roll < 0.12) {
