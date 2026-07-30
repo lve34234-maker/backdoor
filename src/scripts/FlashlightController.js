@@ -4,19 +4,20 @@ const MAX_BATTERY = 100;
 const DRAIN_PER_SEC = 1.6;
 const FLICKER_THRESHOLD = 15;
 
+// Lives directly in the scene (not parented to the camera) so it can be
+// pointed either from the camera (first person) or from the player
+// character (third person) - see Game.js's per-frame transform update.
 export class FlashlightController {
-  constructor(camera) {
+  constructor(scene) {
     this.light = new THREE.SpotLight(0xfff2c0, 0, 14, Math.PI / 7, 0.55, 1.4);
     this.light.castShadow = true;
     this.light.shadow.mapSize.set(512, 512);
     this.light.shadow.bias = -0.002;
 
     this.target = new THREE.Object3D();
-    camera.add(this.light);
-    camera.add(this.target);
     this.light.target = this.target;
-    this.light.position.set(0, 0, 0);
-    this.target.position.set(0, 0, -1);
+    scene.add(this.light);
+    scene.add(this.target);
 
     this.on = false;
     this.battery = MAX_BATTERY;
@@ -33,6 +34,13 @@ export class FlashlightController {
   toggle() {
     if (this.battery <= 0) { this.on = false; return; }
     this.on = !this.on;
+  }
+
+  // originPos: THREE.Vector3 world position to shine from.
+  // forward: THREE.Vector3 (normalized) world direction to point at.
+  setTransform(originPos, forward) {
+    this.light.position.copy(originPos);
+    this.target.position.copy(originPos).add(forward);
   }
 
   update(dt) {

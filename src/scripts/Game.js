@@ -62,7 +62,7 @@ export class Game {
 
     this.ui = new UIManager(document.getElementById('ui-root'));
     this.player = new PlayerController(this.sceneManager.camera, this.input);
-    this.flashlight = new FlashlightController(this.sceneManager.camera);
+    this.flashlight = new FlashlightController(this.sceneManager.scene);
     this.inventory = new Inventory();
     this.entityManager = new EntityManager(this.sceneManager.scene);
     this.buildSystem = new BuildSystem(this.sceneManager.scene, this.sceneManager.camera);
@@ -209,6 +209,22 @@ export class Game {
     cam.position.copy(headPos.clone().addScaledVector(dir, dist));
     cam.rotation.set(0, 0, 0);
     cam.lookAt(headPos.clone().addScaledVector(forward, 0.4));
+  }
+
+  // The flashlight isn't parented to the camera, so it can shine from the
+  // character (not the spectator camera) in third person - otherwise it'd
+  // light up whatever the external camera happens to be aimed at instead
+  // of what the player is actually facing.
+  _updateFlashlightTransform() {
+    if (this.cameraMode === 'first') {
+      const forward = new THREE.Vector3();
+      this.sceneManager.camera.getWorldDirection(forward);
+      this.flashlight.setTransform(this.sceneManager.camera.position, forward);
+    } else {
+      const origin = new THREE.Vector3(this.player.position.x, this.player.position.y + this.player.height * 0.62, this.player.position.z);
+      const forward = new THREE.Vector3(Math.sin(this.player.yaw), -Math.sin(this.player.pitch) * 0.6, Math.cos(this.player.yaw)).normalize();
+      this.flashlight.setTransform(origin, forward);
+    }
   }
 
   _wireUI() {
@@ -748,6 +764,7 @@ export class Game {
     this.player.update(dt);
     this.flashlight.update(dt);
     this._updateCameraMode();
+    this._updateFlashlightTransform();
     updateDoors(this.currentChunk?.doors || [], dt);
     this._scanInteractTarget();
     if (this.buildSystem.active) this.buildSystem.update(this.currentChunk);
