@@ -46,7 +46,8 @@ export class Entity {
     this.mesh = buildEntityMesh(this.def);
     this.mesh.position.copy(position);
     this.dead = false;
-    this.state = this.def.behavior === 'rush' ? 'dormant' : this.def.behavior === 'fakehuman' ? 'disguised' : 'patrol';
+    this.state = (this.def.behavior === 'rush' || this.def.behavior === 'ceiling') ? 'dormant'
+      : this.def.behavior === 'fakehuman' ? 'disguised' : 'patrol';
     this.path = [];
     this.pathIndex = 0;
     this.repathTimer = Math.random() * 0.3;
@@ -58,6 +59,7 @@ export class Entity {
     this.hasScared = false;
     this.rushDir = null;
     this.rushTraveled = 0;
+    this.ceilingAnchorY = position.y;
   }
 
   update(dt, ctx) {
@@ -70,6 +72,7 @@ export class Entity {
       case 'rush': this._updateRush(dt, ctx); break;
       case 'shadow': this._updateShadow(dt, ctx); break;
       case 'scare_once': this._updateScareOnce(dt, ctx); break;
+      case 'ceiling': this._updateCeiling(dt, ctx); break;
       default: break;
     }
   }
@@ -290,6 +293,42 @@ export class Entity {
       ctx.onJumpscare?.('unknown');
       ctx.onEntityContact?.(this.type);
       this.dead = true;
+    }
+  }
+
+  // Hangs motionless near the ceiling until the player walks underneath,
+  // then telegraphs briefly and plunges straight down onto them. A miss
+  // (player moves away in time) retracts it back up to try again later,
+  // rather than despawning - it's a fixture of that spot, not a chaser.
+  _updateCeiling(dt, ctx) {
+    const player = ctx.player;
+    if (this.state === 'dormant') {
+      if (player.isHidden) return;
+      const dx = player.position.x - this.mesh.position.x;
+      const dz = player.position.z - this.mesh.position.z;
+      if (Math.hypot(dx, dz) < this.def.detectionRadius) {
+        this.state = 'telegraph';
+        this.stateTimer = this.def.telegraphTime;
+        ctx.audio?.entityScream(this.mesh);
+        ctx.notify?.('천장에서 무언가 움직였다...');
+      }
+    } else if (this.state === 'telegraph') {
+      this.stateTimer -= dt;
+      this.mesh.position.x += Math.sin(performance.now() * 0.06) * 0.003;
+      if (this.stateTimer <= 0) this.state = 'dropping';
+    } else if (this.state === 'dropping') {
+      const step = this.def.speedChase * dt;
+      this.mesh.position.y = Math.max(0, this.mesh.position.y - step);
+      this._checkContact(ctx);
+      if (this.mesh.position.y <= 0) {
+        this.state = 'recover';
+        this.stateTimer = 1.6;
+      }
+    } else if (this.state === 'recover') {
+      this.stateTimer -= dt;
+      const step = this.def.speedChase * 0.4 * dt;
+      this.mesh.position.y = Math.min(this.ceilingAnchorY, this.mesh.position.y + step);
+      if (this.mesh.position.y >= this.ceilingAnchorY && this.stateTimer <= 0) this.state = 'dormant';
     }
   }
 }

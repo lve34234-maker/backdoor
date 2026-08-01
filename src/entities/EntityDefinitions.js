@@ -115,6 +115,24 @@ export const ENTITY_DEFS = {
     giveUpTime: 8,
     scoreWeight: 1.5
   },
+  ceiling: {
+    name: 'Ceiling Dweller',
+    codexName: 'Ceiling Dweller',
+    codexDesc: '천장에 매달려 조용히 기다리다가, 아래를 지나가면 순식간에 떨어져 덮친다.',
+    behavior: 'ceiling',
+    color: 0x1c1610,
+    height: 1.7,
+    speedPatrol: 0,
+    speedChase: 13,
+    telegraphTime: 0.5,
+    detectionRadius: 3.3,
+    fovDeg: 360,
+    hearingMultiplier: 0,
+    contactRadius: 1.05,
+    damage: 60,
+    instaKill: true,
+    scoreWeight: 1.8
+  },
   unknown: {
     name: 'Unknown',
     codexName: '???',
@@ -163,6 +181,21 @@ export function buildEntityMesh(def) {
   const eyeR = eyeL.clone();
   eyeR.position.x = 0.08;
   group.add(eyeL, eyeR);
+
+  if (def.behavior === 'ceiling') {
+    // Long, gangly limbs dangling below the body - the silhouette that
+    // gives away something is clinging to the ceiling if you look up.
+    const limbGeo = new THREE.CylinderGeometry(0.035, 0.02, 0.75, 6);
+    [-1, 1].forEach((side) => {
+      const limb = new THREE.Mesh(limbGeo, bodyMat);
+      limb.position.set(side * 0.22, bodyHeight * 0.15, 0);
+      limb.rotation.z = side * 0.25;
+      limb.castShadow = true;
+      group.add(limb);
+    });
+    // Hangs head-down from the ceiling.
+    group.rotation.z = Math.PI;
+  }
 
   group.userData.bodyMat = bodyMat;
   group.userData.eyeMat = eyeMat;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ChunkBuilder, CORRIDOR_WIDTH } from './ChunkBuilder.js';
+import { ChunkBuilder, CORRIDOR_WIDTH, WALL_HEIGHT } from './ChunkBuilder.js';
 import { carveCorridor, carveRoomRect, carveMaze, emitWallsFromGrid, cellCenterWorld } from './GridWorld.js';
 import { Grid } from '../system/Pathfinding.js';
 import { createDoor, createFakeDoorPair } from './DoorSystem.js';
@@ -20,8 +20,17 @@ const ENTITY_WEIGHTS_BY_DANGER = (danger) => [
   { value: 'fakehuman', weight: 0.8 + danger * 0.6 },
   { value: 'rush', weight: 0.4 + danger * 1.2 },
   { value: 'shadow', weight: 0.5 + danger * 0.8 },
+  { value: 'ceiling', weight: 0.3 + danger * 0.9 },
   { value: 'unknown', weight: 0.08 + danger * 0.12 }
 ];
+
+// The ceiling ambusher hangs near the ceiling rather than standing on the
+// floor - everywhere else builds an entitySpawn position at y=0.
+function entitySpawnPosition(type, world) {
+  return type === 'ceiling'
+    ? new THREE.Vector3(world.x, WALL_HEIGHT - 0.4, world.z)
+    : new THREE.Vector3(world.x, 0, world.z);
+}
 
 function chooseChunkType(rng, doorIndex) {
   const danger = dangerFactor(doorIndex, 70);
@@ -96,13 +105,13 @@ function placeItemsAndEntity(builder, grid, originX, originZ, rng, doorIndex, op
     const cell = randomWalkableFarCell(grid, entryCell.x, entryCell.z, 5, rng);
     if (cell) {
       const world = cellCenterWorld(cell.cx, cell.cz, originX, originZ, grid.cellSize);
-      builder.entitySpawn = { type: entityType, position: new THREE.Vector3(world.x, 0, world.z) };
+      builder.entitySpawn = { type: entityType, position: entitySpawnPosition(entityType, world) };
     }
   } else if (entitiesAllowed && opts.forceEntity) {
     const cell = randomWalkableFarCell(grid, entryCell.x, entryCell.z, 5, rng);
     if (cell) {
       const world = cellCenterWorld(cell.cx, cell.cz, originX, originZ, grid.cellSize);
-      builder.entitySpawn = { type: opts.forceEntity, position: new THREE.Vector3(world.x, 0, world.z) };
+      builder.entitySpawn = { type: opts.forceEntity, position: entitySpawnPosition(opts.forceEntity, world) };
     }
   }
 

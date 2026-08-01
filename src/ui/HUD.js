@@ -34,13 +34,6 @@ export class HUD {
         </div>
         <div class="hud-interact-prompt" id="hud-interact"></div>
         <div class="hud-notifications" id="hud-notifications"></div>
-        <div id="build-panel" style="display:none">
-          <div class="build-panel-title">건축 모드</div>
-          <div class="build-row"><span>가로 (W)</span><input type="number" id="build-w" min="0.2" max="4" step="0.1" value="1"></div>
-          <div class="build-row"><span>높이 (H)</span><input type="number" id="build-h" min="0.2" max="4" step="0.1" value="1"></div>
-          <div class="build-row"><span>깊이 (D)</span><input type="number" id="build-d" min="0.2" max="4" step="0.1" value="1"></div>
-          <div class="build-hint">G 설치 · H 제거 · P 되돌리기 · V 종료</div>
-        </div>
         <div id="inventory-panel" style="display:none">
           <div class="inv-panel-title">인벤토리</div>
           <div id="inv-panel-grid" class="inv-panel-grid"></div>
@@ -74,11 +67,6 @@ export class HUD {
 
     this.notifications = new Notifications(document.getElementById('hud-notifications'));
     this.achievements = new AchievementToasts(document.getElementById('achv-toast-root'));
-
-    this.buildPanelEl = document.getElementById('build-panel');
-    this.buildWInput = document.getElementById('build-w');
-    this.buildHInput = document.getElementById('build-h');
-    this.buildDInput = document.getElementById('build-d');
 
     this.inventoryPanelEl = document.getElementById('inventory-panel');
     this.inventoryGridEl = document.getElementById('inv-panel-grid');
@@ -134,21 +122,6 @@ export class HUD {
         ${USABLE_ITEM_TYPES.has(item.type) ? `<button class="inv-use-btn" data-type="${item.type}">사용</button>` : ''}
       </div>
     `).join('');
-  }
-
-  setBuildCallback(onChange) {
-    const emit = () => onChange({
-      w: parseFloat(this.buildWInput.value) || 1,
-      h: parseFloat(this.buildHInput.value) || 1,
-      d: parseFloat(this.buildDInput.value) || 1
-    });
-    this.buildWInput.addEventListener('input', emit);
-    this.buildHInput.addEventListener('input', emit);
-    this.buildDInput.addEventListener('input', emit);
-  }
-
-  setBuildPanelVisible(visible) {
-    this.buildPanelEl.style.display = visible ? 'flex' : 'none';
   }
 
   setVisible(visible) {

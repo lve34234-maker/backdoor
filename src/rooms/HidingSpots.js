@@ -28,10 +28,16 @@ export function createLocker(builder, x, z, rotY = 0) {
 
 // The primary hiding spot: a tall wooden wardrobe with two visible doors,
 // a cornice on top and small feet - the classic "closet you hide in".
+// A small chance it's "cursed" - a pair of faint glowing eyes on the door
+// panels hint something is already inside, and hiding in it deals slow
+// damage over time until the player gets back out.
+const CURSED_CHANCE = 0.14;
+
 export function createWardrobe(builder, x, z, rotY = 0) {
   const group = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x4a3220, roughness: 0.8 });
-  const doorMat = new THREE.MeshStandardMaterial({ color: 0x5a3d26, roughness: 0.7 });
+  const cursed = builder.rng.next() < CURSED_CHANCE;
+  const bodyMat = new THREE.MeshStandardMaterial({ color: cursed ? 0x2e2018 : 0x4a3220, roughness: 0.8 });
+  const doorMat = new THREE.MeshStandardMaterial({ color: cursed ? 0x3a2818 : 0x5a3d26, roughness: 0.7 });
   const trimMat = new THREE.MeshStandardMaterial({ color: 0x2e1f14, roughness: 0.9 });
   const metalMat = new THREE.MeshStandardMaterial({ color: 0xc9b98a, metalness: 0.6, roughness: 0.35 });
 
@@ -59,6 +65,15 @@ export function createWardrobe(builder, x, z, rotY = 0) {
     const handle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), metalMat);
     handle.position.set(side * 0.06, height / 2, depth / 2 + 0.06);
     group.add(handle);
+
+    if (cursed) {
+      // A faint pair of eyes peering through the seam of each door -
+      // the one visual tell before the player commits to hiding here.
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff3020 });
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 6), eyeMat);
+      eye.position.set(side * 0.02, height / 2 + 0.28, depth / 2 + 0.03);
+      group.add(eye);
+    }
   });
 
   // Small feet
@@ -75,7 +90,7 @@ export function createWardrobe(builder, x, z, rotY = 0) {
 
   const facing = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY));
   const spotPos = new THREE.Vector3(x, 1.0, z).add(facing.clone().multiplyScalar(0.55));
-  builder.addHidingSpot(spotPos, 'wardrobe', 1.15);
+  builder.addHidingSpot(spotPos, 'wardrobe', 1.15, { cursed });
   return group;
 }
 

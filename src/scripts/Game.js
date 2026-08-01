@@ -15,7 +15,7 @@ import { updateDoors, swingDoorOpen, markDoorFake } from '../rooms/DoorSystem.js
 import { HazardRunner } from '../rooms/Traps.js';
 import { EntityManager } from '../entities/EntityManager.js';
 import { UIManager } from '../ui/UIManager.js';
-import { BuildSystem } from './BuildSystem.js';
+import { ENTITY_DEFS } from '../entities/EntityDefinitions.js';
 import { TOTAL_DOORS, FINAL_DOOR_INDEX, dangerFactor, basementFloor } from '../rooms/Difficulty.js';
 import { ITEM_DEFS, DRAWER_LOOT_ITEMS, USABLE_ITEM_TYPES } from './ItemDefs.js';
 
@@ -60,7 +60,6 @@ export class Game {
     this.flashlight = new FlashlightController(this.sceneManager.scene);
     this.inventory = new Inventory();
     this.entityManager = new EntityManager(this.sceneManager.scene);
-    this.buildSystem = new BuildSystem(this.sceneManager.scene, this.sceneManager.camera);
 
     this.ambientLight = new THREE.AmbientLight(0x3a3420, 0.7);
     this.sceneManager.scene.add(this.ambientLight);
@@ -120,21 +119,6 @@ export class Game {
         this.audio.uiClick();
       }
     });
-    this.input.on('toggleBuild', () => this._toggleBuildMode());
-    this.input.on('buildPlace', () => {
-      if (this.state === 'playing' && this.buildSystem.place(this.currentChunk)) {
-        this.audio.uiClick();
-      }
-    });
-    this.input.on('buildRemove', () => {
-      if (this.state === 'playing') this.buildSystem.removeTargeted(this.currentChunk);
-    });
-    this.input.on('buildUndo', () => {
-      if (this.state === 'playing' && this.buildSystem.undoLast(this.currentChunk)) {
-        this.audio.uiClick();
-        this.ui.hud.notify('마지막 건축물을 되돌렸습니다.');
-      }
-    });
     this.input.on('toggleThirdPerson', () => this._toggleThirdPerson());
     this.input.on('toggleInventory', () => this._toggleInventoryPanel());
 
@@ -142,20 +126,7 @@ export class Game {
       this.audio.footstep(this.sceneManager.camera, { running, crouching });
     };
 
-    this.ui.hud.setBuildCallback(({ w, h, d }) => this.buildSystem.setDimensions(w, h, d));
     this.ui.hud.setUseItemCallback((type) => this._useInventoryItem(type));
-  }
-
-  _toggleBuildMode() {
-    if (this.state !== 'playing') return;
-    const active = this.buildSystem.toggle();
-    this.ui.hud.setBuildPanelVisible(active);
-    if (active) {
-      // Free the cursor so the width/height/depth fields can be clicked;
-      // drag-to-look still works with the mouse button held.
-      this.input.exitPointerLock();
-      this.ui.hud.notify('건축 모드 시작 - 원하는 크기를 정하고 G로 설치하세요.');
-    }
   }
 
   _toggleInventoryPanel() {
@@ -361,11 +332,6 @@ export class Game {
       this.entityManager.clear();
     }
     this.audio.stopAllLoops();
-    this.buildSystem.reset();
-    if (this.buildSystem.active) {
-      this.buildSystem.toggle(false);
-      this.ui.hud.setBuildPanelVisible(false);
-    }
 
     const chunk = generateChunk(doorIndex, this.rng);
     this.sceneManager.scene.add(chunk.group);
@@ -536,12 +502,32 @@ export class Game {
     this.achievements.unlock('first_hide');
     this.audio.breathing(0.5);
     this.ui.hud.notify(HIDE_SPOT_MESSAGES[spot.kind] || '숨었다...');
+    this._cursedHideTimer = 0;
+    this._cursedHideWarned = false;
   }
 
   _exitHiding() {
     if (this.currentHideSpot) this.currentHideSpot.occupied = false;
     this.currentHideSpot = null;
     this.player.isHidden = false;
+    this._cursedHideTimer = 0;
+  }
+
+  // A cursed (eyed) wardrobe isn't actually empty - staying hidden inside
+  // one slowly costs health until the player presses E to get back out.
+  _updateCursedHiding(dt) {
+    if (!this.player.isHidden || !this.currentHideSpot?.cursed) return;
+    this._cursedHideTimer += dt;
+    if (!this._cursedHideWarned) {
+      this._cursedHideWarned = true;
+      this.ui.hud.notify('...안에 뭔가 함께 있다.');
+      this.audio.breathing(1);
+    }
+    if (this._cursedHideTimer >= 1.1) {
+      this._cursedHideTimer = 0;
+      this.deathCause = '옷장 속 무언가에게 당했다.';
+      this._damagePlayer(5);
+    }
   }
 
   _collectItem(item) {
@@ -627,7 +613,7 @@ export class Game {
   }
 
   _onEntityDamage(amount, instaKill, type) {
-    this.deathCause = `${type} 에게 붙잡혔다.`;
+    this.deathCause = `${ENTITY_DEFS[type]?.name || type} 에게 붙잡혔다.`;
     if (instaKill) {
       this.player.health = 0;
       this.ui.hud.flashDamage();
@@ -642,7 +628,7 @@ export class Game {
     this.entitiesSeen[type] += 1;
     this.stats.recordEntitySeen(type);
     if (type === 'unknown') this.achievements.unlock('unknown_seen');
-    if (Object.keys(this.entitiesSeen).length >= 7) this.achievements.unlock('codex_complete');
+    if (Object.keys(this.entitiesSeen).length >= Object.keys(ENTITY_DEFS).length) this.achievements.unlock('codex_complete');
   }
 
   _isDark(position) {
@@ -774,7 +760,7 @@ export class Game {
     this._updateFlashlightTransform();
     updateDoors(this.currentChunk?.doors || [], dt);
     this._scanInteractTarget();
-    if (this.buildSystem.active) this.buildSystem.update(this.currentChunk);
+    this._updateCursedHiding(dt);
 
     if (this.hazardRunner && !this.hazardRunner.done) {
       this.hazardRunner.update(dt, { sceneManager: this.sceneManager });

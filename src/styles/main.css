@@ -347,54 +347,6 @@ html, body {
   animation: fadeInOut 3s ease forwards;
 }
 
-#build-panel {
-  position: absolute;
-  top: 50%;
-  right: 1.2rem;
-  transform: translateY(-50%);
-  flex-direction: column;
-  gap: 0.6rem;
-  background: rgba(10, 10, 8, 0.85);
-  border: 1px solid var(--bd-yellow-dim);
-  padding: 1rem 1.1rem;
-  pointer-events: auto;
-  min-width: 170px;
-}
-
-.build-panel-title {
-  letter-spacing: 0.2em;
-  font-size: 0.85rem;
-  border-bottom: 1px solid var(--bd-yellow-dim);
-  padding-bottom: 0.5rem;
-  margin-bottom: 0.2rem;
-}
-
-.build-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  font-size: 0.78rem;
-}
-
-.build-row input[type="number"] {
-  width: 64px;
-  background: #111;
-  color: var(--bd-yellow);
-  border: 1px solid var(--bd-yellow-dim);
-  padding: 0.2rem 0.35rem;
-  font-family: inherit;
-}
-
-.build-hint {
-  font-size: 0.65rem;
-  color: #999;
-  letter-spacing: 0.1em;
-  margin-top: 0.3rem;
-  border-top: 1px solid #333;
-  padding-top: 0.5rem;
-}
-
 #inventory-panel {
   position: absolute;
   top: 50%;

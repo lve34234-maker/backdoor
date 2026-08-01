@@ -108,8 +108,8 @@ export class ChunkBuilder {
     return mesh;
   }
 
-  addHidingSpot(position, kind, radius = 1.1) {
-    this.hidingSpots.push({ position: position.clone(), kind, radius, occupied: false });
+  addHidingSpot(position, kind, radius = 1.1, extra = {}) {
+    this.hidingSpots.push({ position: position.clone(), kind, radius, occupied: false, ...extra });
   }
 
   // A searchable container (e.g. a drawer/dresser) - not a hiding spot, but
