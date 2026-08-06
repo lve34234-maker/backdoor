@@ -124,6 +124,33 @@ npm run preview
 
 ---
 
+## 안드로이드 APK 빌드
+
+[Capacitor](https://capacitorjs.com/)로 웹 빌드를 감싼 `android/` 네이티브 프로젝트가 포함되어
+있습니다. Android SDK 다운로드가 필요하므로, 이 저장소로 push할 때마다
+**GitHub Actions가 자동으로 실제 APK를 빌드**합니다 (`.github/workflows/build-apk.yml`).
+
+### 자동 빌드된 APK 받기 (추천)
+
+1. 저장소의 **Actions** 탭 → **Build Android APK** 워크플로우 실행 목록에서 가장 최근(성공한) 실행을 엽니다.
+2. 하단 **Artifacts**에서 `backdoor-debug-apk`를 다운로드해 압축을 풀면 `app-debug.apk`가 나옵니다.
+3. 안드로이드 기기로 옮긴 뒤 "출처를 알 수 없는 앱 설치" 권한을 허용하고 설치합니다.
+
+### 로컬에서 직접 빌드하기
+
+Android Studio (또는 Android SDK + JDK 17)가 설치되어 있다면:
+
+```bash
+npm run android:sync   # 웹 빌드 후 android/ 프로젝트에 동기화
+npm run android:open   # Android Studio로 열기 (또는 android/ 폴더를 직접 열기)
+```
+
+Android Studio에서 **Build → Build Bundle(s) / APK(s) → Build APK(s)**를 실행하면
+`android/app/build/outputs/apk/debug/app-debug.apk`가 생성됩니다. 커맨드라인만으로도
+가능합니다: `cd android && ./gradlew assembleDebug`.
+
+---
+
 ## Firebase 클라우드 저장 (선택 사항)
 
 기본 상태(설정 없음)에서는 LocalStorage에만 저장되며 완전히 정상 동작합니다. 다른 기기에서도
