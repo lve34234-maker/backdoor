@@ -151,6 +151,41 @@ Android Studio에서 **Build → Build Bundle(s) / APK(s) → Build APK(s)**를 
 
 ---
 
+## iOS 앱 빌드
+
+마찬가지로 Capacitor로 감싼 `ios/` 네이티브 프로젝트가 포함되어 있습니다. iOS 빌드는 macOS +
+Xcode가 있어야만 가능해서, push할 때마다 **GitHub Actions의 macOS 러너가 자동으로 시뮬레이터용
+빌드**를 만듭니다 (`.github/workflows/build-ios.yml`).
+
+### 자동 빌드 결과 받기 (시뮬레이터용, 서명 불필요)
+
+1. 저장소의 **Actions** 탭 → **Build iOS App (Simulator)** 워크플로우의 최근 실행을 엽니다.
+2. **Artifacts**에서 `backdoor-ios-simulator-app`를 받으면 iOS 시뮬레이터에서 바로 실행해볼 수
+   있는 `App.app`이 들어 있습니다 (실기기에는 이 상태로 설치할 수 없습니다 - 아래 참고).
+
+### 실제 iPhone/iPad에 설치하기
+
+Apple은 실기기에 앱을 설치하려면 반드시 **본인 소유의 Apple ID로 직접 서명**하도록 요구합니다.
+이건 Apple 정책상 저나 CI가 대신 해줄 수 없는 부분이라, macOS에서 다음 과정을 직접 진행해야
+합니다 (Apple Developer 유료 계정 없이 **무료 Apple ID**로도 가능하며, 이 방식은 7일마다
+재서명이 필요합니다):
+
+1. macOS에서 Xcode 설치 후 이 저장소를 클론합니다.
+2. `npm install && npm run build && npx cap sync ios`
+3. `npx cap open ios`로 Xcode를 엽니다.
+4. Xcode에서 **Signing & Capabilities** 탭 → Team을 본인 Apple ID(Personal Team)로 선택합니다.
+5. iPhone을 케이블로 연결하고 기기를 빌드 대상으로 선택한 뒤 ▶(Run)을 누르면 기기에 설치됩니다.
+   (최초 1회 iPhone에서 **설정 → 일반 → VPN 및 기기 관리**에서 개발자를 신뢰 처리해야 합니다.)
+
+### 터치 컨트롤
+
+APK/iOS 앱(또는 터치스크린을 가진 브라우저)에서 실행하면 화면에 자동으로 가상 조작이
+나타납니다: 좌측 하단 **가상 조이스틱**으로 이동하고, 화면을 드래그해 시점을 돌리며, 우측의
+버튼들로 상호작용(E)/점프/손전등/달리기/앉기/가방/시점전환/메뉴를 조작합니다. 데스크톱
+브라우저(터치 미지원)에서는 기존처럼 키보드+마우스만 표시됩니다.
+
+---
+
 ## Firebase 클라우드 저장 (선택 사항)
 
 기본 상태(설정 없음)에서는 LocalStorage에만 저장되며 완전히 정상 동작합니다. 다른 기기에서도

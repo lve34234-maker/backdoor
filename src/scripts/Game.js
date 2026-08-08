@@ -15,6 +15,7 @@ import { updateDoors, swingDoorOpen, markDoorFake } from '../rooms/DoorSystem.js
 import { HazardRunner } from '../rooms/Traps.js';
 import { EntityManager } from '../entities/EntityManager.js';
 import { UIManager } from '../ui/UIManager.js';
+import { TouchControls, isTouchDevice } from '../ui/TouchControls.js';
 import { ENTITY_DEFS } from '../entities/EntityDefinitions.js';
 import { TOTAL_DOORS, FINAL_DOOR_INDEX, dangerFactor, basementFloor } from '../rooms/Difficulty.js';
 import { ITEM_DEFS, DRAWER_LOOT_ITEMS, USABLE_ITEM_TYPES } from './ItemDefs.js';
@@ -56,6 +57,8 @@ export class Game {
     this.achievements = new AchievementManager((def) => this.ui?.hud.unlockToast(def));
 
     this.ui = new UIManager(document.getElementById('ui-root'));
+    this.touchControls = isTouchDevice() ? new TouchControls(document.getElementById('ui-root'), this.input) : null;
+    if (this.touchControls) document.getElementById('app').classList.add('touch-mode');
     this.player = new PlayerController(this.sceneManager.camera, this.input);
     this.flashlight = new FlashlightController(this.sceneManager.scene);
     this.inventory = new Inventory();
@@ -127,6 +130,7 @@ export class Game {
     };
 
     this.ui.hud.setUseItemCallback((type) => this._useInventoryItem(type));
+    this.ui.hud.setCloseInventoryCallback(() => this._toggleInventoryPanel());
   }
 
   _toggleInventoryPanel() {
@@ -134,6 +138,11 @@ export class Game {
     this.inventoryPanelOpen = !this.inventoryPanelOpen;
     this.ui.hud.setInventoryPanelVisible(this.inventoryPanelOpen);
     this.audio.uiClick();
+    // Touch controls' full-screen look-drag layer would otherwise sit above
+    // parts of the panel and eat taps meant for it - simplest fix is to
+    // just hide the joystick/buttons while the panel is open; the panel has
+    // its own close (X) button for touch users.
+    this.touchControls?.setVisible(!this.inventoryPanelOpen);
     if (this.inventoryPanelOpen) {
       // Free the cursor so the "사용" buttons can actually be clicked;
       // same reasoning as the build panel.
@@ -276,6 +285,7 @@ export class Game {
     this.state = 'playing';
     this.ui.hide();
     this.ui.hud.setVisible(true);
+    this.touchControls?.setVisible(true);
     document.getElementById('app').classList.add('playing');
     this.input.setEnabled(true);
     this.input.requestPointerLock();
@@ -289,6 +299,7 @@ export class Game {
     this.input.exitPointerLock();
     document.getElementById('app').classList.remove('playing');
     this.ui.hud.setVisible(false);
+    this.touchControls?.setVisible(false);
     this.ui.showMainMenu(this.saveManager.hasSave());
   }
 
@@ -297,6 +308,7 @@ export class Game {
       this.state = 'paused';
       this.input.setEnabled(false);
       this.input.exitPointerLock();
+      this.touchControls?.setVisible(false);
       this.ui.showPause(this._doorLabel());
     } else if (this.state === 'paused') {
       this._resume();
@@ -308,6 +320,7 @@ export class Game {
     this.ui.hide();
     this.input.setEnabled(true);
     this.input.requestPointerLock();
+    this.touchControls?.setVisible(true);
   }
 
   _persist() {
@@ -651,6 +664,7 @@ export class Game {
     if (this.stats.data.deaths >= 5) this.achievements.unlock('survivor_5');
     this.saveManager.clear();
     this.ui.hud.setVisible(false);
+    this.touchControls?.setVisible(false);
     this.ui.showGameOver({
       cause: this.deathCause,
       doorIndex: this.doorIndex,
@@ -671,6 +685,7 @@ export class Game {
     this.achievements.unlock('escaped');
     this.saveManager.clear();
     this.ui.hud.setVisible(false);
+    this.touchControls?.setVisible(false);
     this.ui.showWin({
       timeSec: this.runTimeSec,
       runsCompleted: this.stats.data.runsCompleted,

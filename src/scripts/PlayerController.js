@@ -88,7 +88,7 @@ export class PlayerController {
     if (this.input.backward) move.sub(forward);
     if (this.input.right) move.add(right);
     if (this.input.left) move.sub(right);
-    if (move.lengthSq() > 0) move.normalize().multiplyScalar(speed * dt);
+    if (move.lengthSq() > 0) move.normalize().multiplyScalar(speed * this.input.moveMagnitude * dt);
 
     this._moveWithCollision(move);
 

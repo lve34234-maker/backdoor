@@ -16,6 +16,11 @@ export class InputManager {
     this.dragging = false;
     this._lastDragX = 0;
     this._lastDragY = 0;
+    // Virtual joystick input (touch controls) - -1..1 on each axis, added on
+    // top of the WASD boolean getters below so PlayerController doesn't need
+    // to know whether movement came from a keyboard or an on-screen stick.
+    this.virtualMoveX = 0;
+    this.virtualMoveY = 0;
     this.listeners = {
       interact: [], toggleHide: [], escape: [], toggleFlashlight: [], toggleInventory: [],
       toggleThirdPerson: []
@@ -48,6 +53,24 @@ export class InputManager {
 
   _emit(event) {
     (this.listeners[event] || []).forEach((cb) => cb());
+  }
+
+  // Public trigger for one-shot actions from non-keyboard sources (touch
+  // buttons) - fires the same listeners a real key press would.
+  emitAction(event) {
+    this._emit(event);
+  }
+
+  // Touch joystick feed: x/y each -1..1, y positive = forward.
+  setVirtualMove(x, y) {
+    this.virtualMoveX = x;
+    this.virtualMoveY = y;
+  }
+
+  // Touch look-drag feed - same accumulator the mouse drag fallback uses.
+  addLookDelta(dx, dy) {
+    this.mouseDX += dx;
+    this.mouseDY += dy;
   }
 
   _onClick() {
@@ -145,16 +168,23 @@ export class InputManager {
     return this.keys.has(code);
   }
 
-  get forward() { return this.isDown('KeyW') || this.isDown('ArrowUp'); }
-  get backward() { return this.isDown('KeyS') || this.isDown('ArrowDown'); }
-  get left() { return this.isDown('KeyA') || this.isDown('ArrowLeft'); }
-  get right() { return this.isDown('KeyD') || this.isDown('ArrowRight'); }
+  get forward() { return this.isDown('KeyW') || this.isDown('ArrowUp') || this.virtualMoveY > 0.25; }
+  get backward() { return this.isDown('KeyS') || this.isDown('ArrowDown') || this.virtualMoveY < -0.25; }
+  get left() { return this.isDown('KeyA') || this.isDown('ArrowLeft') || this.virtualMoveX < -0.25; }
+  get right() { return this.isDown('KeyD') || this.isDown('ArrowRight') || this.virtualMoveX > 0.25; }
   get sprint() { return this.isDown('ShiftLeft') || this.isDown('ShiftRight'); }
   get crouch() { return this.isDown('KeyC'); }
   get jump() { return this.isDown('Space'); }
 
+  // Analog speed scale from the virtual joystick's deflection; keyboard
+  // input has no concept of "how hard" a key is pressed, so it stays at 1.
+  get moveMagnitude() {
+    const vm = Math.hypot(this.virtualMoveX, this.virtualMoveY);
+    return vm > 0.05 ? Math.min(1, vm) : 1;
+  }
+
   setEnabled(v) {
     this.enabled = v;
-    if (!v) { this.keys.clear(); this.dragging = false; }
+    if (!v) { this.keys.clear(); this.dragging = false; this.virtualMoveX = 0; this.virtualMoveY = 0; }
   }
 }

@@ -1,0 +1,55 @@
+name: Build iOS App (Simulator)
+
+on:
+  push:
+    branches:
+      - claude/backdoor-horror-game-axlfpg
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch: {}
+
+jobs:
+  build-ios-sim:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Sync Capacitor iOS project
+        run: npx cap sync ios
+
+      # Unsigned build for the iOS Simulator - no Apple Developer account or
+      # certificates needed, since the Simulator doesn't require code
+      # signing. This is a "does it actually build" check anyone can run;
+      # a real iPhone needs an Apple ID's own signing (see README).
+      - name: Build for iOS Simulator
+        working-directory: ios/App
+        run: |
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package .app for download
+        run: |
+          cd ios/App/build/Build/Products/Debug-iphonesimulator
+          zip -r App-simulator.zip App.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backdoor-ios-simulator-app
+          path: ios/App/build/Build/Products/Debug-iphonesimulator/App-simulator.zip
+          if-no-files-found: error

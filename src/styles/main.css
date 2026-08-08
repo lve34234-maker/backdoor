@@ -282,6 +282,12 @@ html, body {
   align-items: flex-end;
 }
 
+/* The touch jump/interact buttons live in that same corner - lift the
+   coin/inventory readout clear of them. */
+#app.touch-mode .hud-bottom-right {
+  bottom: 4.6rem;
+}
+
 .hud-hide-status {
   color: #5fce6b;
   letter-spacing: 0.2em;
@@ -360,13 +366,32 @@ html, body {
   pointer-events: auto;
   min-width: 340px;
   max-width: 480px;
+  /* Above the touch-controls look-drag layer (z-index 25) so its full-screen
+     hit area doesn't swallow taps meant for this panel on mobile. */
+  z-index: 35;
 }
 
 .inv-panel-title {
+  position: relative;
   letter-spacing: 0.25em;
   font-size: 1rem;
   border-bottom: 1px solid var(--bd-yellow-dim);
   padding-bottom: 0.6rem;
+}
+
+.inv-panel-close-btn {
+  position: absolute;
+  right: 0;
+  top: -0.2rem;
+  pointer-events: auto;
+  background: none;
+  border: 1px solid var(--bd-yellow-dim);
+  color: var(--bd-yellow);
+  font-family: inherit;
+  font-size: 0.85rem;
+  width: 26px;
+  height: 26px;
+  line-height: 1;
 }
 
 .inv-panel-grid {
@@ -509,6 +534,114 @@ html, body {
 #fade-overlay.active {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* ---------- Touch controls (mobile) ---------- */
+
+.tc-root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.tc-look-zone {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.tc-joystick-zone {
+  position: absolute;
+  left: 20px;
+  /* Sits above the HUD's health/stamina/battery bars (bottom-left, ~100px
+     tall) instead of on top of them. */
+  bottom: 150px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: rgba(20, 18, 10, 0.35);
+  border: 2px solid rgba(214, 195, 75, 0.35);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.tc-joystick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  background: rgba(214, 195, 75, 0.45);
+  border: 2px solid rgba(214, 195, 75, 0.7);
+  transition: transform 0.08s linear;
+}
+
+.tc-btn {
+  pointer-events: auto;
+  touch-action: none;
+  font-family: inherit;
+  color: var(--bd-yellow);
+  background: rgba(20, 18, 10, 0.55);
+  border: 1px solid rgba(214, 195, 75, 0.4);
+  border-radius: 10px;
+  letter-spacing: 0.05em;
+}
+
+.tc-btn.tc-pressed {
+  background: rgba(214, 195, 75, 0.35);
+  border-color: var(--bd-yellow);
+}
+
+.tc-btn-round {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+}
+
+.tc-buttons-main {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  pointer-events: none;
+}
+
+.tc-btn-interact {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.tc-buttons-secondary {
+  position: absolute;
+  right: 22px;
+  bottom: 108px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.tc-btn-sm {
+  padding: 0.4rem 0.7rem;
+  font-size: 0.75rem;
+  min-width: 64px;
+}
+
+.tc-buttons-top {
+  position: absolute;
+  right: 16px;
+  /* Below the HUD's door number / FPS row so the two don't overlap. */
+  top: 60px;
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
 }
 
 /* ---------- End screens ---------- */

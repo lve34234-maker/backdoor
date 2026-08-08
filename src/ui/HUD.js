@@ -35,7 +35,7 @@ export class HUD {
         <div class="hud-interact-prompt" id="hud-interact"></div>
         <div class="hud-notifications" id="hud-notifications"></div>
         <div id="inventory-panel" style="display:none">
-          <div class="inv-panel-title">인벤토리</div>
+          <div class="inv-panel-title">인벤토리<button id="inv-panel-close" class="inv-panel-close-btn">✕</button></div>
           <div id="inv-panel-grid" class="inv-panel-grid"></div>
           <div class="inv-panel-hint">Tab 닫기</div>
         </div>
@@ -77,6 +77,8 @@ export class HUD {
       const btn = e.target.closest('.inv-use-btn');
       if (btn && this._onUseItem) this._onUseItem(btn.dataset.type);
     });
+    this._onCloseInventory = null;
+    document.getElementById('inv-panel-close').addEventListener('click', () => this._onCloseInventory?.());
 
     this._fpsTimer = 0;
     this._fpsFrames = 0;
@@ -84,6 +86,10 @@ export class HUD {
 
   setUseItemCallback(cb) {
     this._onUseItem = cb;
+  }
+
+  setCloseInventoryCallback(cb) {
+    this._onCloseInventory = cb;
   }
 
   setInventoryPanelVisible(visible) {
