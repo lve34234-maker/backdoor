@@ -132,9 +132,14 @@ npm run preview
 
 ### 자동 빌드된 APK 받기 (추천)
 
-1. 저장소의 **Actions** 탭 → **Build Android APK** 워크플로우 실행 목록에서 가장 최근(성공한) 실행을 엽니다.
-2. 하단 **Artifacts**에서 `backdoor-debug-apk`를 다운로드해 압축을 풀면 `app-debug.apk`가 나옵니다.
-3. 안드로이드 기기로 옮긴 뒤 "출처를 알 수 없는 앱 설치" 권한을 허용하고 설치합니다.
+이 브랜치에 push될 때마다 CI가 빌드한 APK를 저장소의 **[`app/apk/backdoor.apk`](app/apk/backdoor.apk)**
+파일 하나로 항상 최신 상태로 유지합니다 - Actions 페이지를 따로 뒤질 필요 없이, 저장소에서 이
+파일만 다운로드하면 됩니다 (GitHub 웹에서 파일을 연 뒤 **Download raw file**).
+
+안드로이드 기기로 옮긴 뒤 "출처를 알 수 없는 앱 설치" 권한을 허용하고 설치합니다.
+
+(과거 실행 기록은 **Actions** 탭 → **Build Android APK** → 해당 실행의 **Artifacts**에서도 볼 수
+있습니다.)
 
 ### 로컬에서 직접 빌드하기
 
@@ -159,9 +164,12 @@ Xcode가 있어야만 가능해서, push할 때마다 **GitHub Actions의 macOS 
 
 ### 자동 빌드 결과 받기 (시뮬레이터용, 서명 불필요)
 
-1. 저장소의 **Actions** 탭 → **Build iOS App (Simulator)** 워크플로우의 최근 실행을 엽니다.
-2. **Artifacts**에서 `backdoor-ios-simulator-app`를 받으면 iOS 시뮬레이터에서 바로 실행해볼 수
-   있는 `App.app`이 들어 있습니다 (실기기에는 이 상태로 설치할 수 없습니다 - 아래 참고).
+마찬가지로 **[`app/ios/backdoor-ios-simulator.zip`](app/ios/backdoor-ios-simulator.zip)** 파일
+하나로 항상 최신 빌드가 저장소에 유지됩니다. 압축을 풀면 iOS 시뮬레이터에서 바로 실행해볼 수
+있는 `App.app`이 들어 있습니다 (실기기에는 이 상태로 설치할 수 없습니다 - 아래 참고).
+
+(과거 실행 기록은 **Actions** 탭 → **Build iOS App (Simulator)** → 해당 실행의 **Artifacts**에서도
+볼 수 있습니다.)
 
 ### 실제 iPhone/iPad에 설치하기
 

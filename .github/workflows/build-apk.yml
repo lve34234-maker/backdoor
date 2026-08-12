@@ -6,7 +6,12 @@ on:
       - claude/backdoor-horror-game-axlfpg
     paths-ignore:
       - '**.md'
+      - 'app/apk/**'
+      - 'app/ios/**'
   workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 jobs:
   build-apk:
@@ -51,3 +56,24 @@ jobs:
           name: backdoor-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # Keep a single always-current copy of the APK committed in the repo
+      # itself, so it can be grabbed directly instead of digging through
+      # Actions run artifacts each time.
+      - name: Commit built APK into app/apk
+        run: |
+          mkdir -p app/apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk app/apk/backdoor.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/apk/backdoor.apk
+          if git diff --cached --quiet; then
+            echo "APK unchanged, nothing to commit."
+            exit 0
+          fi
+          git commit -m "chore: update built app/apk/backdoor.apk [skip ci]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break
+            echo "Push attempt $i failed, retrying..."
+            sleep $((i * 3))
+          done

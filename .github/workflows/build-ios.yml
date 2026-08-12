@@ -6,7 +6,12 @@ on:
       - claude/backdoor-horror-game-axlfpg
     paths-ignore:
       - '**.md'
+      - 'app/apk/**'
+      - 'app/ios/**'
   workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 jobs:
   build-ios-sim:
@@ -53,3 +58,25 @@ jobs:
           name: backdoor-ios-simulator-app
           path: ios/App/build/Build/Products/Debug-iphonesimulator/App-simulator.zip
           if-no-files-found: error
+
+      # Keep a single always-current copy committed in the repo itself, so
+      # it can be grabbed directly instead of digging through Actions run
+      # artifacts each time. App.app is a directory bundle, not a single
+      # file, so the zip from the previous step stands in as "one file".
+      - name: Commit built app into app/ios
+        run: |
+          mkdir -p app/ios
+          cp ios/App/build/Build/Products/Debug-iphonesimulator/App-simulator.zip app/ios/backdoor-ios-simulator.zip
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/ios/backdoor-ios-simulator.zip
+          if git diff --cached --quiet; then
+            echo "iOS build unchanged, nothing to commit."
+            exit 0
+          fi
+          git commit -m "chore: update built app/ios/backdoor-ios-simulator.zip [skip ci]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break
+            echo "Push attempt $i failed, retrying..."
+            sleep $((i * 3))
+          done
