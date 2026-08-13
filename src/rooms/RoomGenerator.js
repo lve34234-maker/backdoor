@@ -87,7 +87,19 @@ function placeItemsAndEntity(builder, grid, originX, originZ, rng, doorIndex, op
       ? rng.pick(builder.searchables)
       : null;
     if (!keyDrawer) {
-      const cell = randomWalkableFarCell(grid, entryCell.x, entryCell.z, 3, rng);
+      // This drawer isn't run through pickSpacedPoint like the room's own
+      // furniture, so without a check here it could land right on top of
+      // a wardrobe/locker/etc already placed in the room - keep retrying
+      // until a cell clear of everything already there turns up.
+      const existingSpots = [...builder.hidingSpots, ...builder.searchables];
+      let cell = null;
+      for (let tries = 0; tries < 15; tries++) {
+        const candidate = randomWalkableFarCell(grid, entryCell.x, entryCell.z, 3, rng);
+        if (!candidate) break;
+        const world = cellCenterWorld(candidate.cx, candidate.cz, originX, originZ, grid.cellSize);
+        const clear = existingSpots.every((s) => Math.hypot(world.x - s.position.x, world.z - s.position.z) >= 2.4);
+        if (clear || tries === 14) { cell = candidate; break; }
+      }
       if (cell) {
         const world = cellCenterWorld(cell.cx, cell.cz, originX, originZ, grid.cellSize);
         createDrawer(builder, world.x, world.z, rng.range(0, Math.PI * 2));
@@ -118,18 +130,46 @@ function placeItemsAndEntity(builder, grid, originX, originZ, rng, doorIndex, op
   return { lockedExit };
 }
 
-// Rejection-sampling helper so furniture placed in the same room doesn't
-// end up stacked on top of / overlapping each other.
+// Furniture placement helper so pieces placed in the same room don't end
+// up stacked on top of / overlapping each other. Pure random rejection
+// sampling gets unreliable once a room fills up (a crowded "hiding_room"
+// can ask for up to ~8 pieces) - by the last item or two, most of the
+// room is already within minDist of something, and random guessing can
+// easily burn its whole try budget without ever landing in the shrinking
+// valid area. Sampling a jittered grid instead guarantees the search
+// actually covers the room, so a valid spot gets found whenever one
+// geometrically exists instead of depending on random luck.
 function pickSpacedPoint(rng, x0, z0, w, h, margin, minDist, placed) {
+  const maxX = Math.max(margin + 0.01, w - margin);
+  const maxZ = Math.max(margin + 0.01, h - margin);
+  const step = 0.6;
+  const candidates = [];
+  for (let cx = margin; cx <= maxX; cx += step) {
+    for (let cz = margin; cz <= maxZ; cz += step) {
+      candidates.push({
+        rx: x0 + cx + rng.range(-step * 0.3, step * 0.3),
+        rz: z0 + cz + rng.range(-step * 0.3, step * 0.3)
+      });
+    }
+  }
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+
   let best = null;
-  for (let tries = 0; tries < 20; tries++) {
-    const rx = x0 + rng.range(margin, Math.max(margin + 0.01, w - margin));
-    const rz = z0 + rng.range(margin, Math.max(margin + 0.01, h - margin));
-    if (placed.every((p) => Math.hypot(rx - p.x, rz - p.z) >= minDist)) {
+  let bestNearest = -Infinity;
+  for (const { rx, rz } of candidates) {
+    const nearest = placed.length ? Math.min(...placed.map((p) => Math.hypot(rx - p.x, rz - p.z))) : Infinity;
+    if (nearest >= minDist) {
       best = { rx, rz };
+      bestNearest = nearest;
       break;
     }
-    best = { rx, rz };
+    if (nearest > bestNearest) {
+      bestNearest = nearest;
+      best = { rx, rz };
+    }
   }
   placed.push({ x: best.rx, z: best.rz });
   return best;
@@ -185,18 +225,36 @@ function buildCorridorChunk(rng, doorIndex) {
     builder.addFluorescentLight(c.x, c.z);
   }
 
-  // Occasional wall-mounted hiding spot along the corridor
+  // Occasional wall-mounted hiding spot + searchable drawer along the
+  // corridor. Both used to roll their (side, Z) independently, so roughly
+  // 1 in 6 corridors ended up with the wardrobe and drawer landing at
+  // overlapping/adjacent spots on the same wall - track what's already
+  // placed here and keep the drawer clear of it.
+  const MIN_WALL_SPOT_SEP = 2.6;
+  const wallSpotZMin = 4, wallSpotZMax = Math.max(5, length1 - 3);
+  const placedWallSpots = [];
+
+  const pickWallSpot = () => {
+    let best = null;
+    for (let tries = 0; tries < 12; tries++) {
+      const side = rng.bool(0.5) ? -1 : 1;
+      const spotZ = rng.range(wallSpotZMin, wallSpotZMax);
+      const clear = placedWallSpots.every((p) => p.side !== side || Math.abs(p.spotZ - spotZ) >= MIN_WALL_SPOT_SEP);
+      if (clear) { best = { side, spotZ }; break; }
+      best = { side, spotZ };
+    }
+    placedWallSpots.push(best);
+    return best;
+  };
+
   if (rng.bool(0.45)) {
-    const spotZ = rng.range(4, Math.max(5, length1 - 3));
-    const side = rng.bool(0.5) ? -1 : 1;
+    const { side, spotZ } = pickWallSpot();
     const c = cellCenterWorld(marginX + side * (CORRIDOR_WIDTH / 2 - 0.5), spotZ, originX, originZ, 1);
     createWardrobe(builder, c.x, c.z, side === 1 ? -Math.PI / 2 : Math.PI / 2);
   }
 
-  // Occasional searchable drawer along the corridor, on its own wall spot
   if (rng.bool(0.35)) {
-    const spotZ = rng.range(4, Math.max(5, length1 - 3));
-    const side = rng.bool(0.5) ? -1 : 1;
+    const { side, spotZ } = pickWallSpot();
     const c = cellCenterWorld(marginX + side * (CORRIDOR_WIDTH / 2 - 0.4), spotZ, originX, originZ, 1);
     createDrawer(builder, c.x, c.z, side === 1 ? -Math.PI / 2 : Math.PI / 2);
   }
@@ -220,8 +278,12 @@ function buildRoomChunk(rng, doorIndex, { hiding = false } = {}) {
   const stub1 = rng.int(3, 5);
   let end = carveCorridor(grid, marginX, 0, stub1, { dx: 0, dy: 1 }, CORRIDOR_WIDTH);
 
-  const roomW = hiding ? rng.int(12, 16) : rng.int(9, 13);
-  const roomH = hiding ? rng.int(12, 16) : rng.int(9, 13);
+  // Sized with enough headroom for furnitureMinDist(2.4)-spaced pieces
+  // below to actually fit reliably - the previous 9-16 range packed a
+  // "hiding_room" (up to ~8 pieces) tightly enough that pickSpacedPoint
+  // regularly had to fall back to a too-close spot just to place them all.
+  const roomW = hiding ? rng.int(14, 18) : rng.int(10, 14);
+  const roomH = hiding ? rng.int(14, 18) : rng.int(10, 14);
   const roomX0 = end.x - Math.floor(roomW / 2);
   const roomZ0 = end.y;
   carveRoomRect(grid, roomX0, roomZ0, roomW, roomH);
@@ -250,7 +312,7 @@ function buildRoomChunk(rng, doorIndex, { hiding = false } = {}) {
   // they never overlap or crowd into a cluttered pile.
   const furnitureMinDist = 2.4;
   const placedFurniture = [];
-  const spotCount = hiding ? rng.int(3, 5) : rng.int(1, 2);
+  const spotCount = hiding ? rng.int(3, 4) : rng.int(1, 2);
   const spots = [];
   for (let i = 0; i < spotCount; i++) {
     const { rx, rz } = pickSpacedPoint(rng, roomX0, roomZ0, roomW, roomH, 1.4, furnitureMinDist, placedFurniture);
@@ -296,7 +358,13 @@ function buildMazeChunk(rng, doorIndex) {
   const mazeOriginX = marginCells;
   const mazeOriginY = entryStubLen;
 
-  const entryCenterX = Math.round(mazeOriginX + roomSize / 2);
+  // Math.round(x + roomSize/2) rounds the exact ".5" case (odd roomSize)
+  // up, shifting the stub's centre a full column off from the room it's
+  // supposed to align with - carveCorridor's own width math instead uses
+  // floor()/ceil() around the centre, so matching that here with
+  // Math.floor keeps the stub's columns exactly inside the room's columns
+  // instead of jogging over by one and leaving a wall sliver at the door.
+  const entryCenterX = mazeOriginX + Math.floor(roomSize / 2);
   const entryWidth = Math.min(CORRIDOR_WIDTH, roomSize);
   let end = carveCorridor(grid, entryCenterX, 0, mazeOriginY, { dx: 0, dy: 1 }, entryWidth);
 
@@ -306,7 +374,7 @@ function buildMazeChunk(rng, doorIndex) {
 
   const farCell = maze.deadEnds.length ? maze.deadEnds[maze.deadEnds.length - 1] : [cols - 1, rows - 1];
   const farOrigin = maze.roomOrigin(farCell[0], farCell[1]);
-  const exitX = Math.round(farOrigin.x + roomSize / 2);
+  const exitX = farOrigin.x + Math.floor(roomSize / 2);
   const exitZ = farOrigin.y + roomSize;
   const end2 = carveCorridor(grid, exitX, exitZ, exitStubLen, { dx: 0, dy: 1 }, roomSize);
 
@@ -327,11 +395,18 @@ function buildMazeChunk(rng, doorIndex) {
     }
   }
 
-  // A hiding spot in ~half the dead ends
+  // A hiding spot in ~half the dead ends. The exit door's stub can run a
+  // couple of cells past its own room and into the footprint of a
+  // neighbouring maze room that's unrelated in the maze graph but close in
+  // world space, so a wardrobe centred there (plus its arbitrary rotation
+  // widening its bounding box) could reach far enough to clip the door -
+  // skip any dead end whose centre lands too close to the door itself.
+  const DOOR_CLEARANCE = 2.6;
   maze.deadEnds.slice(0, -1).forEach((cell) => {
     if (!rng.bool(0.5)) return;
     const o = maze.roomOrigin(cell[0], cell[1]);
     const c = cellCenterWorld(o.x + roomSize / 2, o.y + roomSize / 2, originX, originZ, 1);
+    if (Math.hypot(c.x - exitWorld.x, c.z - exitWorld.z) < DOOR_CLEARANCE) return;
     createWardrobe(builder, c.x, c.z, rng.range(0, Math.PI * 2));
   });
 
